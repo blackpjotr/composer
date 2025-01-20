@@ -19,42 +19,42 @@ class PoolTest extends TestCase
 {
     public function testPool(): void
     {
-        $package = $this->getPackage('foo', '1');
+        $package = self::getPackage('foo', '1');
 
         $pool = $this->createPool([$package]);
 
-        $this->assertEquals([$package], $pool->whatProvides('foo'));
-        $this->assertEquals([$package], $pool->whatProvides('foo'));
+        self::assertEquals([$package], $pool->whatProvides('foo'));
+        self::assertEquals([$package], $pool->whatProvides('foo'));
     }
 
     public function testWhatProvidesPackageWithConstraint(): void
     {
-        $firstPackage = $this->getPackage('foo', '1');
-        $secondPackage = $this->getPackage('foo', '2');
+        $firstPackage = self::getPackage('foo', '1');
+        $secondPackage = self::getPackage('foo', '2');
 
         $pool = $this->createPool([
             $firstPackage,
             $secondPackage,
         ]);
 
-        $this->assertEquals([$firstPackage, $secondPackage], $pool->whatProvides('foo'));
-        $this->assertEquals([$secondPackage], $pool->whatProvides('foo', $this->getVersionConstraint('==', '2')));
+        self::assertEquals([$firstPackage, $secondPackage], $pool->whatProvides('foo'));
+        self::assertEquals([$secondPackage], $pool->whatProvides('foo', self::getVersionConstraint('==', '2')));
     }
 
     public function testPackageById(): void
     {
-        $package = $this->getPackage('foo', '1');
+        $package = self::getPackage('foo', '1');
 
         $pool = $this->createPool([$package]);
 
-        $this->assertSame($package, $pool->packageById(1));
+        self::assertSame($package, $pool->packageById(1));
     }
 
     public function testWhatProvidesWhenPackageCannotBeFound(): void
     {
         $pool = $this->createPool();
 
-        $this->assertEquals([], $pool->whatProvides('foo'));
+        self::assertEquals([], $pool->whatProvides('foo'));
     }
 
     /**

@@ -75,7 +75,7 @@ class GitLabDriverTest extends TestCase
         $fs->removeDirectory($this->home);
     }
 
-    public function provideInitializeUrls(): array
+    public static function provideInitializeUrls(): array
     {
         return [
             ['https://gitlab.com/mygroup/myproject', 'https://gitlab.com/api/v4/projects/mygroup%2Fmyproject'],
@@ -86,6 +86,8 @@ class GitLabDriverTest extends TestCase
 
     /**
      * @dataProvider provideInitializeUrls
+     * @param non-empty-string $url
+     * @param non-empty-string $apiUrl
      */
     public function testInitialize(string $url, string $apiUrl): GitLabDriver
     {
@@ -116,16 +118,18 @@ JSON;
         $driver = new GitLabDriver(['url' => $url], $this->io, $this->config, $this->httpDownloader, $this->process);
         $driver->initialize();
 
-        $this->assertEquals($apiUrl, $driver->getApiUrl(), 'API URL is derived from the repository URL');
-        $this->assertEquals('mymaster', $driver->getRootIdentifier(), 'Root identifier is the default branch in GitLab');
-        $this->assertEquals('git@gitlab.com:mygroup/myproject.git', $driver->getRepositoryUrl(), 'The repository URL is the SSH one by default');
-        $this->assertEquals('https://gitlab.com/mygroup/myproject', $driver->getUrl());
+        self::assertEquals($apiUrl, $driver->getApiUrl(), 'API URL is derived from the repository URL');
+        self::assertEquals('mymaster', $driver->getRootIdentifier(), 'Root identifier is the default branch in GitLab');
+        self::assertEquals('git@gitlab.com:mygroup/myproject.git', $driver->getRepositoryUrl(), 'The repository URL is the SSH one by default');
+        self::assertEquals('https://gitlab.com/mygroup/myproject', $driver->getUrl());
 
         return $driver;
     }
 
     /**
      * @dataProvider provideInitializeUrls
+     * @param non-empty-string $url
+     * @param non-empty-string $apiUrl
      */
     public function testInitializePublicProject(string $url, string $apiUrl): GitLabDriver
     {
@@ -154,16 +158,18 @@ JSON;
         $driver = new GitLabDriver(['url' => $url], $this->io, $this->config, $this->httpDownloader, $this->process);
         $driver->initialize();
 
-        $this->assertEquals($apiUrl, $driver->getApiUrl(), 'API URL is derived from the repository URL');
-        $this->assertEquals('mymaster', $driver->getRootIdentifier(), 'Root identifier is the default branch in GitLab');
-        $this->assertEquals('https://gitlab.com/mygroup/myproject.git', $driver->getRepositoryUrl(), 'The repository URL is the SSH one by default');
-        $this->assertEquals('https://gitlab.com/mygroup/myproject', $driver->getUrl());
+        self::assertEquals($apiUrl, $driver->getApiUrl(), 'API URL is derived from the repository URL');
+        self::assertEquals('mymaster', $driver->getRootIdentifier(), 'Root identifier is the default branch in GitLab');
+        self::assertEquals('https://gitlab.com/mygroup/myproject.git', $driver->getRepositoryUrl(), 'The repository URL is the SSH one by default');
+        self::assertEquals('https://gitlab.com/mygroup/myproject', $driver->getUrl());
 
         return $driver;
     }
 
     /**
      * @dataProvider provideInitializeUrls
+     * @param non-empty-string $url
+     * @param non-empty-string $apiUrl
      */
     public function testInitializePublicProjectAsAnonymous(string $url, string $apiUrl): GitLabDriver
     {
@@ -191,10 +197,10 @@ JSON;
         $driver = new GitLabDriver(['url' => $url], $this->io, $this->config, $this->httpDownloader, $this->process);
         $driver->initialize();
 
-        $this->assertEquals($apiUrl, $driver->getApiUrl(), 'API URL is derived from the repository URL');
-        $this->assertEquals('mymaster', $driver->getRootIdentifier(), 'Root identifier is the default branch in GitLab');
-        $this->assertEquals('https://gitlab.com/mygroup/myproject.git', $driver->getRepositoryUrl(), 'The repository URL is the SSH one by default');
-        $this->assertEquals('https://gitlab.com/mygroup/myproject', $driver->getUrl());
+        self::assertEquals($apiUrl, $driver->getApiUrl(), 'API URL is derived from the repository URL');
+        self::assertEquals('mymaster', $driver->getRootIdentifier(), 'Root identifier is the default branch in GitLab');
+        self::assertEquals('https://gitlab.com/mygroup/myproject.git', $driver->getRepositoryUrl(), 'The repository URL is the SSH one by default');
+        self::assertEquals('https://gitlab.com/mygroup/myproject', $driver->getUrl());
 
         return $driver;
     }
@@ -232,10 +238,26 @@ JSON;
         $driver = new GitLabDriver(['url' => $url], $this->io, $this->config, $this->httpDownloader, $this->process);
         $driver->initialize();
 
-        $this->assertEquals($apiUrl, $driver->getApiUrl(), 'API URL is derived from the repository URL');
-        $this->assertEquals('1.0.x', $driver->getRootIdentifier(), 'Root identifier is the default branch in GitLab');
-        $this->assertEquals($url.'.git', $driver->getRepositoryUrl(), 'The repository URL is the SSH one by default');
-        $this->assertEquals($url, $driver->getUrl());
+        self::assertEquals($apiUrl, $driver->getApiUrl(), 'API URL is derived from the repository URL');
+        self::assertEquals('1.0.x', $driver->getRootIdentifier(), 'Root identifier is the default branch in GitLab');
+        self::assertEquals($url.'.git', $driver->getRepositoryUrl(), 'The repository URL is the SSH one by default');
+        self::assertEquals($url, $driver->getUrl());
+    }
+
+    public function testInvalidSupportData(): void
+    {
+        $driver = $this->testInitialize($repoUrl = 'https://gitlab.com/mygroup/myproject', 'https://gitlab.com/api/v4/projects/mygroup%2Fmyproject');
+        $this->setAttribute($driver, 'branches', ['main' => 'SOMESHA']);
+        $this->setAttribute($driver, 'tags', []);
+
+        $this->httpDownloader->expects([
+            ['url' => 'https://gitlab.com/api/v4/projects/mygroup%2Fmyproject/repository/files/composer%2Ejson/raw?ref=SOMESHA', 'body' => '{"support": "'.$repoUrl.'" }'],
+        ], true);
+
+        $data = $driver->getComposerInformation('main');
+
+        self::assertIsArray($data);
+        self::assertSame('https://gitlab.com/mygroup/myproject/-/tree/main', $data['support']['source']);
     }
 
     public function testGetDist(): void
@@ -250,7 +272,7 @@ JSON;
             'shasum' => '',
         ];
 
-        $this->assertEquals($expected, $driver->getDist($reference));
+        self::assertEquals($expected, $driver->getDist($reference));
     }
 
     public function testGetSource(): void
@@ -264,7 +286,7 @@ JSON;
             'reference' => $reference,
         ];
 
-        $this->assertEquals($expected, $driver->getSource($reference));
+        self::assertEquals($expected, $driver->getSource($reference));
     }
 
     public function testGetSource_GivenPublicProject(): void
@@ -278,7 +300,7 @@ JSON;
             'reference' => $reference,
         ];
 
-        $this->assertEquals($expected, $driver->getSource($reference));
+        self::assertEquals($expected, $driver->getSource($reference));
     }
 
     public function testGetTags(): void
@@ -318,8 +340,8 @@ JSON;
             'v2.0.0' => '8e8f60b3ec86d63733db3bd6371117a758027ec6',
         ];
 
-        $this->assertEquals($expected, $driver->getTags());
-        $this->assertEquals($expected, $driver->getTags(), 'Tags are cached');
+        self::assertEquals($expected, $driver->getTags());
+        self::assertEquals($expected, $driver->getTags(), 'Tags are cached');
     }
 
     public function testGetPaginatedRefs(): void
@@ -380,8 +402,8 @@ JSON;
             'stagingdupe' => '502cffe49f136443f2059803f2e7192d1ac066cd',
         ];
 
-        $this->assertEquals($expected, $driver->getBranches());
-        $this->assertEquals($expected, $driver->getBranches(), 'Branches are cached');
+        self::assertEquals($expected, $driver->getBranches());
+        self::assertEquals($expected, $driver->getBranches(), 'Branches are cached');
     }
 
     public function testGetBranches(): void
@@ -422,8 +444,8 @@ JSON;
             'staging' => '502cffe49f136443f2059803f2e7192d1ac066cd',
         ];
 
-        $this->assertEquals($expected, $driver->getBranches());
-        $this->assertEquals($expected, $driver->getBranches(), 'Branches are cached');
+        self::assertEquals($expected, $driver->getBranches());
+        self::assertEquals($expected, $driver->getBranches(), 'Branches are cached');
     }
 
     /**
@@ -432,10 +454,10 @@ JSON;
      */
     public function testSupports(string $url, bool $expected): void
     {
-        $this->assertSame($expected, GitLabDriver::supports($this->io, $this->config, $url));
+        self::assertSame($expected, GitLabDriver::supports($this->io, $this->config, $url));
     }
 
-    public function dataForTestSupports(): array
+    public static function dataForTestSupports(): array
     {
         return [
             ['http://gitlab.com/foo/bar', true],
@@ -488,7 +510,7 @@ JSON;
         $driver = new GitLabDriver(['url' => $url], $this->io, $this->config, $this->httpDownloader, $this->process);
         $driver->initialize();
 
-        $this->assertEquals($apiUrl, $driver->getApiUrl(), 'API URL is derived from the repository URL');
+        self::assertEquals($apiUrl, $driver->getApiUrl(), 'API URL is derived from the repository URL');
     }
 
     public function testGitlabSubGroup(): void
@@ -520,7 +542,7 @@ JSON;
         $driver = new GitLabDriver(['url' => $url], $this->io, $this->config, $this->httpDownloader, $this->process);
         $driver->initialize();
 
-        $this->assertEquals($apiUrl, $driver->getApiUrl(), 'API URL is derived from the repository URL');
+        self::assertEquals($apiUrl, $driver->getApiUrl(), 'API URL is derived from the repository URL');
     }
 
     public function testGitlabSubDirectorySubGroup(): void
@@ -552,7 +574,7 @@ JSON;
         $driver = new GitLabDriver(['url' => $url], $this->io, $this->config, $this->httpDownloader, $this->process);
         $driver->initialize();
 
-        $this->assertEquals($apiUrl, $driver->getApiUrl(), 'API URL is derived from the repository URL');
+        self::assertEquals($apiUrl, $driver->getApiUrl(), 'API URL is derived from the repository URL');
     }
 
     public function testForwardsOptions(): void
@@ -623,6 +645,17 @@ JSON;
         $config->merge(['config' => ['gitlab-protocol' => 'http']]);
         $driver = new GitLabDriver(['url' => $url], $this->io, $config, $this->httpDownloader, $this->process);
         $driver->initialize();
-        $this->assertEquals('https://gitlab.com/mygroup/myproject.git', $driver->getRepositoryUrl(), 'Repository URL matches config request for http not git');
+        self::assertEquals('https://gitlab.com/mygroup/myproject.git', $driver->getRepositoryUrl(), 'Repository URL matches config request for http not git');
+    }
+
+    /**
+     * @param object $object
+     * @param mixed  $value
+     */
+    protected function setAttribute($object, string $attribute, $value): void
+    {
+        $attr = new \ReflectionProperty($object, $attribute);
+        $attr->setAccessible(true);
+        $attr->setValue($object, $value);
     }
 }

@@ -27,10 +27,10 @@ class VersionParserTest extends TestCase
     {
         $versionParser = new VersionParser();
 
-        $this->assertSame($result, $versionParser->parseNameVersionPairs($pairs));
+        self::assertSame($result, $versionParser->parseNameVersionPairs($pairs));
     }
 
-    public function provideParseNameVersionPairsData(): array
+    public static function provideParseNameVersionPairsData(): array
     {
         return [
             [['php:^7.0'], [['name' => 'php', 'version' => '^7.0']]],
@@ -46,10 +46,10 @@ class VersionParserTest extends TestCase
      */
     public function testIsUpgrade(string $from, string $to, bool $expected): void
     {
-        $this->assertSame($expected, VersionParser::isUpgrade($from, $to));
+        self::assertSame($expected, VersionParser::isUpgrade($from, $to));
     }
 
-    public function provideIsUpgradeTests(): array
+    public static function provideIsUpgradeTests(): array
     {
         return [
             ['0.9.0.0', '1.0.0.0', true],

@@ -27,19 +27,19 @@ class TlsHelperTest extends TestCase
         $certificate['subject']['commonName'] = $expectedCn = array_shift($certNames);
         $certificate['extensions']['subjectAltName'] = $certNames ? 'DNS:'.implode(',DNS:', $certNames) : '';
 
-        // @phpstan-ignore-next-line
+        // @phpstan-ignore staticMethod.deprecatedClass
         $result = TlsHelper::checkCertificateHost($certificate, $hostname, $foundCn);
 
         if (true === $expectedResult) {
-            $this->assertTrue($result);
-            $this->assertSame($expectedCn, $foundCn);
+            self::assertTrue($result);
+            self::assertSame($expectedCn, $foundCn);
         } else {
-            $this->assertFalse($result);
-            $this->assertNull($foundCn);
+            self::assertFalse($result);
+            self::assertNull($foundCn);
         }
     }
 
-    public function dataCheckCertificateHost(): array
+    public static function dataCheckCertificateHost(): array
     {
         return [
             [true, 'getcomposer.org', ['getcomposer.org']],
@@ -70,11 +70,12 @@ class TlsHelperTest extends TestCase
         $certificate['subject']['commonName'] = 'example.net';
         $certificate['extensions']['subjectAltName'] = 'DNS: example.com, IP: 127.0.0.1, DNS: getcomposer.org, Junk: blah, DNS: composer.example.org';
 
-        // @phpstan-ignore-next-line
+        // @phpstan-ignore staticMethod.deprecatedClass
         $names = TlsHelper::getCertificateNames($certificate);
 
-        $this->assertSame('example.net', $names['cn']);
-        $this->assertSame([
+        self::assertIsArray($names);
+        self::assertSame('example.net', $names['cn']);
+        self::assertSame([
             'example.com',
             'getcomposer.org',
             'composer.example.org',

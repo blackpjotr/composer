@@ -65,7 +65,7 @@ class GitHubDriver extends VcsDriver
 
         $this->owner = $match[3];
         $this->repository = $match[4];
-        $this->originUrl = strtolower(!empty($match[1]) ? $match[1] : $match[2]);
+        $this->originUrl = strtolower($match[1] ?? (string) $match[2]);
         if ($this->originUrl === 'www.github.com') {
             $this->originUrl = 'github.com';
         }
@@ -172,6 +172,9 @@ class GitHubDriver extends VcsDriver
 
             if ($composer !== null) {
                 // specials for github
+                if (isset($composer['support']) && !is_array($composer['support'])) {
+                    $composer['support'] = [];
+                }
                 if (!isset($composer['support']['source'])) {
                     $label = array_search($identifier, $this->getTags()) ?: array_search($identifier, $this->getBranches()) ?: $identifier;
                     $composer['support']['source'] = sprintf('https://%s/%s/%s/tree/%s', $this->originUrl, $this->owner, $this->repository, $label);
@@ -227,59 +230,86 @@ class GitHubDriver extends VcsDriver
         $key = null;
         foreach (Preg::split('{\r?\n}', $funding) as $line) {
             $line = trim($line);
-            if (Preg::isMatch('{^(\w+)\s*:\s*(.+)$}', $line, $match)) {
+            if (Preg::isMatchStrictGroups('{^(\w+)\s*:\s*(.+)$}', $line, $match)) {
                 if ($match[2] === '[') {
                     $key = $match[1];
                     continue;
                 }
-                if (Preg::isMatch('{^\[(.*)\](?:\s*#.*)?$}', $match[2], $match2)) {
+                if (Preg::isMatchStrictGroups('{^\[(.*?)\](?:\s*#.*)?$}', $match[2], $match2)) {
                     foreach (array_map('trim', Preg::split('{[\'"]?\s*,\s*[\'"]?}', $match2[1])) as $item) {
                         $result[] = ['type' => $match[1], 'url' => trim($item, '"\' ')];
                     }
-                } elseif (Preg::isMatch('{^([^#].*?)(\s+#.*)?$}', $match[2], $match2)) {
+                } elseif (Preg::isMatchStrictGroups('{^([^#].*?)(?:\s+#.*)?$}', $match[2], $match2)) {
                     $result[] = ['type' => $match[1], 'url' => trim($match2[1], '"\' ')];
                 }
                 $key = null;
-            } elseif (Preg::isMatch('{^(\w+)\s*:\s*#\s*$}', $line, $match)) {
+            } elseif (Preg::isMatchStrictGroups('{^(\w+)\s*:\s*#\s*$}', $line, $match)) {
                 $key = $match[1];
-            } elseif ($key && (
-                Preg::isMatch('{^-\s*(.+)(\s+#.*)?$}', $line, $match)
-                || Preg::isMatch('{^(.+),(\s*#.*)?$}', $line, $match)
+            } elseif ($key !== null && (
+                Preg::isMatchStrictGroups('{^-\s*(.+)(?:\s+#.*)?$}', $line, $match)
+                || Preg::isMatchStrictGroups('{^(.+),(?:\s*#.*)?$}', $line, $match)
             )) {
                 $result[] = ['type' => $key, 'url' => trim($match[1], '"\' ')];
-            } elseif ($key && $line === ']') {
+            } elseif ($key !== null && $line === ']') {
                 $key = null;
             }
         }
 
         foreach ($result as $key => $item) {
             switch ($item['type']) {
-                case 'tidelift':
-                    $result[$key]['url'] = 'https://tidelift.com/funding/github/' . $item['url'];
+                case 'community_bridge':
+                    $result[$key]['url'] = 'https://funding.communitybridge.org/projects/' . basename($item['url']);
                     break;
                 case 'github':
                     $result[$key]['url'] = 'https://github.com/' . basename($item['url']);
                     break;
-                case 'patreon':
-                    $result[$key]['url'] = 'https://www.patreon.com/' . basename($item['url']);
-                    break;
-                case 'otechie':
-                    $result[$key]['url'] = 'https://otechie.com/' . basename($item['url']);
-                    break;
-                case 'open_collective':
-                    $result[$key]['url'] = 'https://opencollective.com/' . basename($item['url']);
-                    break;
-                case 'liberapay':
-                    $result[$key]['url'] = 'https://liberapay.com/' . basename($item['url']);
+                case 'issuehunt':
+                    $result[$key]['url'] = 'https://issuehunt.io/r/' . $item['url'];
                     break;
                 case 'ko_fi':
                     $result[$key]['url'] = 'https://ko-fi.com/' . basename($item['url']);
                     break;
-                case 'issuehunt':
-                    $result[$key]['url'] = 'https://issuehunt.io/r/' . $item['url'];
+                case 'liberapay':
+                    $result[$key]['url'] = 'https://liberapay.com/' . basename($item['url']);
                     break;
-                case 'community_bridge':
-                    $result[$key]['url'] = 'https://funding.communitybridge.org/projects/' . basename($item['url']);
+                case 'open_collective':
+                    $result[$key]['url'] = 'https://opencollective.com/' . basename($item['url']);
+                    break;
+                case 'patreon':
+                    $result[$key]['url'] = 'https://www.patreon.com/' . basename($item['url']);
+                    break;
+                case 'tidelift':
+                    $result[$key]['url'] = 'https://tidelift.com/funding/github/' . $item['url'];
+                    break;
+                case 'polar':
+                    $result[$key]['url'] = 'https://polar.sh/' . basename($item['url']);
+                    break;
+                case 'buy_me_a_coffee':
+                    $result[$key]['url'] = 'https://www.buymeacoffee.com/' . basename($item['url']);
+                    break;
+                case 'thanks_dev':
+                    $result[$key]['url'] = 'https://thanks.dev/' . $item['url'];
+                    break;
+                case 'otechie':
+                    $result[$key]['url'] = 'https://otechie.com/' . basename($item['url']);
+                    break;
+                case 'custom':
+                    $bits = parse_url($item['url']);
+                    if ($bits === false) {
+                        unset($result[$key]);
+                        break;
+                    }
+
+                    if (!array_key_exists('scheme', $bits) && !array_key_exists('host', $bits)) {
+                        if (Preg::isMatch('{^[a-z0-9-]++\.[a-z]{2,3}$}', $item['url'])) {
+                            $result[$key]['url'] = 'https://'.$item['url'];
+                            break;
+                        }
+
+                        $this->io->writeError('<warning>Funding URL '.$item['url'].' not in a supported format.</warning>');
+                        unset($result[$key]);
+                        break;
+                    }
                     break;
             }
         }
@@ -305,7 +335,7 @@ class GitHubDriver extends VcsDriver
             $resource = $this->getContents($resource['git_url'])->decodeJson();
         }
 
-        if (empty($resource['content']) || $resource['encoding'] !== 'base64' || !($content = base64_decode($resource['content']))) {
+        if (!isset($resource['content']) || $resource['encoding'] !== 'base64' || false === ($content = base64_decode($resource['content']))) {
             throw new \RuntimeException('Could not retrieve ' . $file . ' for '.$identifier);
         }
 
@@ -395,7 +425,7 @@ class GitHubDriver extends VcsDriver
             return false;
         }
 
-        $originUrl = !empty($matches[2]) ? $matches[2] : $matches[3];
+        $originUrl = $matches[2] ?? (string) $matches[3];
         if (!in_array(strtolower(Preg::replace('{^www\.}i', '', $originUrl)), $config->get('github-domains'))) {
             return false;
         }

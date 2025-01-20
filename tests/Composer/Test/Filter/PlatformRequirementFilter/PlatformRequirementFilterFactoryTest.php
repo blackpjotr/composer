@@ -25,13 +25,13 @@ final class PlatformRequirementFilterFactoryTest extends TestCase
      */
     public function testFromBoolOrList($boolOrList, $expectedInstance): void
     {
-        $this->assertInstanceOf($expectedInstance, PlatformRequirementFilterFactory::fromBoolOrList($boolOrList));
+        self::assertInstanceOf($expectedInstance, PlatformRequirementFilterFactory::fromBoolOrList($boolOrList));
     }
 
     /**
      * @return array<string, mixed[]>
      */
-    public function dataFromBoolOrList(): array
+    public static function dataFromBoolOrList(): array
     {
         return [
             'true creates IgnoreAllFilter' => [true, 'Composer\Filter\PlatformRequirementFilter\IgnoreAllPlatformRequirementFilter'],
@@ -52,13 +52,13 @@ final class PlatformRequirementFilterFactoryTest extends TestCase
     {
         $platformRequirementFilter = PlatformRequirementFilterFactory::ignoreAll();
 
-        $this->assertInstanceOf('Composer\Filter\PlatformRequirementFilter\IgnoreAllPlatformRequirementFilter', $platformRequirementFilter);
+        self::assertInstanceOf('Composer\Filter\PlatformRequirementFilter\IgnoreAllPlatformRequirementFilter', $platformRequirementFilter);
     }
 
     public function testIgnoreNothing(): void
     {
         $platformRequirementFilter = PlatformRequirementFilterFactory::ignoreNothing();
 
-        $this->assertInstanceOf('Composer\Filter\PlatformRequirementFilter\IgnoreNothingPlatformRequirementFilter', $platformRequirementFilter);
+        self::assertInstanceOf('Composer\Filter\PlatformRequirementFilter\IgnoreNothingPlatformRequirementFilter', $platformRequirementFilter);
     }
 }

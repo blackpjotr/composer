@@ -50,7 +50,10 @@ class PoolBuilderTest extends TestCase
         $stabilityFlags = !empty($root['stability-flags']) ? $root['stability-flags'] : [];
         $rootReferences = !empty($root['references']) ? $root['references'] : [];
         $stabilityFlags = array_map(static function ($stability): int {
-            return BasePackage::$stabilities[$stability];
+            if (!isset(BasePackage::STABILITIES[$stability])) {
+                throw new \LogicException('Invalid stability given: '.$stability);
+            }
+            return BasePackage::STABILITIES[$stability];
         }, $stabilityFlags);
 
         $parser = new VersionParser();
@@ -126,7 +129,7 @@ class PoolBuilderTest extends TestCase
             if (isset($requestData['allowTransitiveDeps']) && $requestData['allowTransitiveDeps']) {
                 $transitiveDeps = Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS;
             }
-            $request->setUpdateAllowList(array_flip($requestData['allowList']), $transitiveDeps);
+            $request->setUpdateAllowList($requestData['allowList'], $transitiveDeps);
         }
 
         foreach ($fixed as $fixedPackage) {
@@ -137,18 +140,22 @@ class PoolBuilderTest extends TestCase
 
         $result = $this->getPackageResultSet($pool, $packageIds);
 
-        $this->assertSame($expect, $result, 'Unoptimized pool does not match expected package set');
+        sort($expect);
+        sort($result);
+        self::assertSame($expect, $result, 'Unoptimized pool does not match expected package set');
 
         $optimizer = new PoolOptimizer(new DefaultPolicy());
         $result = $this->getPackageResultSet($optimizer->optimize($request, $pool), $packageIds);
-        $this->assertSame($expectOptimized, $result, 'Optimized pool does not match expected package set');
+        sort($expectOptimized);
+        sort($result);
+        self::assertSame($expectOptimized, $result, 'Optimized pool does not match expected package set');
 
         chdir($oldCwd);
     }
 
     /**
      * @param array<int, BasePackage> $packageIds
-     * @return string[]
+     * @return list<string|int>
      */
     private function getPackageResultSet(Pool $pool, array $packageIds): array
     {
@@ -185,9 +192,9 @@ class PoolBuilderTest extends TestCase
     /**
      * @return array<string, array<string>>
      */
-    public function getIntegrationTests(): array
+    public static function getIntegrationTests(): array
     {
-        $fixturesDir = realpath(__DIR__.'/Fixtures/poolbuilder/');
+        $fixturesDir = (string) realpath(__DIR__.'/Fixtures/poolbuilder/');
         $tests = [];
         foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($fixturesDir), \RecursiveIteratorIterator::LEAVES_ONLY) as $file) {
             $file = (string) $file;
@@ -197,7 +204,7 @@ class PoolBuilderTest extends TestCase
             }
 
             try {
-                $testData = $this->readTestFile($file, $fixturesDir);
+                $testData = self::readTestFile($file, $fixturesDir);
 
                 $message = $testData['TEST'];
 
@@ -224,7 +231,7 @@ class PoolBuilderTest extends TestCase
     /**
      * @return array<string, string>
      */
-    protected function readTestFile(string $file, string $fixturesDir): array
+    protected static function readTestFile(string $file, string $fixturesDir): array
     {
         $tokens = Preg::split('#(?:^|\n*)--([A-Z-]+)--\n#', file_get_contents($file), -1, PREG_SPLIT_DELIM_CAPTURE);
 

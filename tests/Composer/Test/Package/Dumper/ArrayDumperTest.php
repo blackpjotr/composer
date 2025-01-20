@@ -31,8 +31,8 @@ class ArrayDumperTest extends TestCase
 
     public function testRequiredInformation(): void
     {
-        $config = $this->dumper->dump($this->getPackage());
-        $this->assertEquals(
+        $config = $this->dumper->dump(self::getPackage());
+        self::assertEquals(
             [
                 'name' => 'dummy/pkg',
                 'version' => '1.0.0',
@@ -45,29 +45,29 @@ class ArrayDumperTest extends TestCase
 
     public function testRootPackage(): void
     {
-        $package = $this->getRootPackage();
+        $package = self::getRootPackage();
         $package->setMinimumStability('dev');
 
         $config = $this->dumper->dump($package);
-        $this->assertSame('dev', $config['minimum-stability']);
+        self::assertSame('dev', $config['minimum-stability']);
     }
 
     public function testDumpAbandoned(): void
     {
-        $package = $this->getPackage();
+        $package = self::getPackage();
         $package->setAbandoned(true);
         $config = $this->dumper->dump($package);
 
-        $this->assertTrue($config['abandoned']);
+        self::assertTrue($config['abandoned']);
     }
 
     public function testDumpAbandonedReplacement(): void
     {
-        $package = $this->getPackage();
+        $package = self::getPackage();
         $package->setAbandoned('foo/bar');
         $config = $this->dumper->dump($package);
 
-        $this->assertSame('foo/bar', $config['abandoned']);
+        self::assertSame('foo/bar', $config['abandoned']);
     }
 
     /**
@@ -79,17 +79,17 @@ class ArrayDumperTest extends TestCase
      */
     public function testKeys(string $key, $value, ?string $method = null, $expectedValue = null): void
     {
-        $package = $this->getRootPackage();
+        $package = self::getRootPackage();
 
-        // @phpstan-ignore-next-line
-        $package->{'set'.ucfirst($method ?: $key)}($value);
+        // @phpstan-ignore method.dynamicName
+        $package->{'set'.ucfirst($method ?? $key)}($value);
 
         $config = $this->dumper->dump($package);
 
-        $this->assertSame($expectedValue ?: $value, $config[$key]);
+        self::assertSame($expectedValue ?: $value, $config[$key]);
     }
 
-    public function provideKeys(): array
+    public static function provideKeys(): array
     {
         return [
             [
@@ -233,6 +233,11 @@ class ArrayDumperTest extends TestCase
                 'transport-options',
                 ['ssl' => ['local_cert' => '/opt/certs/test.pem']],
                 'transportOptions',
+            ],
+            [
+                'php-ext',
+                ['extension-name' => 'test'],
+                'phpExt',
             ],
         ];
     }

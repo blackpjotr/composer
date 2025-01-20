@@ -24,13 +24,14 @@ final class IgnoreAllPlatformRequirementFilterTest extends TestCase
     {
         $platformRequirementFilter = new IgnoreAllPlatformRequirementFilter();
 
-        $this->assertSame($expectIgnored, $platformRequirementFilter->isIgnored($req));
+        self::assertSame($expectIgnored, $platformRequirementFilter->isIgnored($req));
+        self::assertSame($expectIgnored, $platformRequirementFilter->isUpperBoundIgnored($req));
     }
 
     /**
      * @return array<string, mixed[]>
      */
-    public function dataIsIgnored(): array
+    public static function dataIsIgnored(): array
     {
         return [
             'php is ignored' => ['php', true],

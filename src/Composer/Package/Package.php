@@ -23,6 +23,7 @@ use Composer\Util\ComposerMirror;
  *
  * @phpstan-import-type AutoloadRules from PackageInterface
  * @phpstan-import-type DevAutoloadRules from PackageInterface
+ * @phpstan-import-type PhpExtConfig from PackageInterface
  */
 class Package extends BasePackage
 {
@@ -38,17 +39,17 @@ class Package extends BasePackage
     protected $sourceUrl;
     /** @var ?string */
     protected $sourceReference;
-    /** @var ?array<int, array{url: string, preferred: bool}> */
+    /** @var ?list<array{url: non-empty-string, preferred: bool}> */
     protected $sourceMirrors;
-    /** @var ?string */
+    /** @var ?non-empty-string */
     protected $distType;
-    /** @var ?string */
+    /** @var ?non-empty-string */
     protected $distUrl;
     /** @var ?string */
     protected $distReference;
     /** @var ?string */
     protected $distSha1Checksum;
-    /** @var ?array<int, array{url: string, preferred: bool}> */
+    /** @var ?list<array{url: non-empty-string, preferred: bool}> */
     protected $distMirrors;
     /** @var string */
     protected $version;
@@ -98,6 +99,11 @@ class Package extends BasePackage
     protected $isDefaultBranch = false;
     /** @var mixed[] */
     protected $transportOptions = [];
+    /**
+     * @var array|null
+     * @phpstan-var PhpExtConfig|null
+     */
+    protected $phpExt = null;
 
     /**
      * Creates a new in memory package.
@@ -276,7 +282,7 @@ class Package extends BasePackage
      */
     public function setDistType(?string $type): void
     {
-        $this->distType = $type;
+        $this->distType = $type === '' ? null : $type;
     }
 
     /**
@@ -288,11 +294,11 @@ class Package extends BasePackage
     }
 
     /**
-     * @param string $url
+     * @param string|null $url
      */
     public function setDistUrl(?string $url): void
     {
-        $this->distUrl = $url;
+        $this->distUrl = $url === '' ? null : $url;
     }
 
     /**
@@ -591,6 +597,26 @@ class Package extends BasePackage
     }
 
     /**
+     * Sets the settings for php extension packages
+     *
+     * @param array|null $phpExt
+     *
+     * @phpstan-param PhpExtConfig|null $phpExt
+     */
+    public function setPhpExt(?array $phpExt): void
+    {
+        $this->phpExt = $phpExt;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getPhpExt(): ?array
+    {
+        return $this->phpExt;
+    }
+
+    /**
      * Sets the notification URL
      */
     public function setNotificationUrl(string $notificationUrl): void
@@ -658,9 +684,9 @@ class Package extends BasePackage
     /**
      * @param mixed[]|null $mirrors
      *
-     * @return string[]
+     * @return list<non-empty-string>
      *
-     * @phpstan-param list<array{url: string, preferred: bool}>|null $mirrors
+     * @phpstan-param list<array{url: non-empty-string, preferred: bool}>|null $mirrors
      */
     protected function getUrls(?string $url, ?array $mirrors, ?string $ref, ?string $type, string $urlType): array
     {

@@ -49,13 +49,19 @@ class RootPackageLoader extends ArrayLoader
      */
     private $versionGuesser;
 
+    /**
+     * @var IOInterface|null
+     */
+    private $io;
+
     public function __construct(RepositoryManager $manager, Config $config, ?VersionParser $parser = null, ?VersionGuesser $versionGuesser = null, ?IOInterface $io = null)
     {
         parent::__construct($parser);
 
         $this->manager = $manager;
         $this->config = $config;
-        $this->versionGuesser = $versionGuesser ?: new VersionGuesser($config, new ProcessExecutor($io), $this->versionParser);
+        $this->versionGuesser = $versionGuesser ?: new VersionGuesser($config, new ProcessExecutor($io), $this->versionParser, $io);
+        $this->io = $io;
     }
 
     /**
@@ -82,7 +88,7 @@ class RootPackageLoader extends ArrayLoader
 
             // override with env var if available
             if (Platform::getEnv('COMPOSER_ROOT_VERSION')) {
-                $config['version'] = Platform::getEnv('COMPOSER_ROOT_VERSION');
+                $config['version'] = $this->versionGuesser->getRootVersionFromEnv();
             } else {
                 $versionData = $this->versionGuesser->guessVersion($config, $cwd ?? Platform::getCwd(true));
                 if ($versionData) {
@@ -93,6 +99,14 @@ class RootPackageLoader extends ArrayLoader
             }
 
             if (!isset($config['version'])) {
+                if ($this->io !== null && $config['name'] !== '__root__' && 'project' !== ($config['type'] ?? '')) {
+                    $this->io->warning(
+                        sprintf(
+                            "Composer could not detect the root package (%s) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version",
+                            $config['name']
+                        )
+                    );
+                }
                 $config['version'] = '1.0.0';
                 $autoVersioned = true;
             }
@@ -193,7 +207,7 @@ class RootPackageLoader extends ArrayLoader
     private function extractAliases(array $requires, array $aliases): array
     {
         foreach ($requires as $reqName => $reqVersion) {
-            if (Preg::isMatch('{^([^,\s#]+)(?:#[^ ]+)? +as +([^,\s]+)$}', $reqVersion, $match)) {
+            if (Preg::isMatchStrictGroups('{(?:^|\| *|, *)([^,\s#|]+)(?:#[^ ]+)? +as +([^,\s|]+)(?:$| *\|| *,)}', $reqVersion, $match)) {
                 $aliases[] = [
                     'package' => strtolower($reqName),
                     'version' => $this->versionParser->normalize($match[1], $reqVersion),
@@ -213,6 +227,7 @@ class RootPackageLoader extends ArrayLoader
      *
      * @param array<string, string> $requires
      * @param array<string, int>    $stabilityFlags
+     * @param key-of<BasePackage::STABILITIES> $minimumStability
      *
      * @return array<string, int>
      *
@@ -221,8 +236,7 @@ class RootPackageLoader extends ArrayLoader
      */
     public static function extractStabilityFlags(array $requires, string $minimumStability, array $stabilityFlags): array
     {
-        $stabilities = BasePackage::$stabilities;
-        /** @var int $minimumStability */
+        $stabilities = BasePackage::STABILITIES;
         $minimumStability = $stabilities[$minimumStability];
         foreach ($requires as $reqName => $reqVersion) {
             $constraints = [];
@@ -239,7 +253,7 @@ class RootPackageLoader extends ArrayLoader
             // parse explicit stability flags to the most unstable
             $matched = false;
             foreach ($constraints as $constraint) {
-                if (Preg::isMatch('{^[^@]*?@('.implode('|', array_keys($stabilities)).')$}i', $constraint, $match)) {
+                if (Preg::isMatchStrictGroups('{^[^@]*?@('.implode('|', array_keys($stabilities)).')$}i', $constraint, $match)) {
                     $name = strtolower($reqName);
                     $stability = $stabilities[VersionParser::normalizeStability($match[1])];
 
@@ -285,7 +299,7 @@ class RootPackageLoader extends ArrayLoader
     {
         foreach ($requires as $reqName => $reqVersion) {
             $reqVersion = Preg::replace('{^([^,\s@]+) as .+$}', '$1', $reqVersion);
-            if (Preg::isMatch('{^[^,\s@]+?#([a-f0-9]+)$}', $reqVersion, $match) && 'dev' === VersionParser::parseStability($reqVersion)) {
+            if (Preg::isMatchStrictGroups('{^[^,\s@]+?#([a-f0-9]+)$}', $reqVersion, $match) && 'dev' === VersionParser::parseStability($reqVersion)) {
                 $name = strtolower($reqName);
                 $references[$name] = $match[1];
             }

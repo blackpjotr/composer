@@ -51,7 +51,7 @@ class XzDownloaderTest extends TestCase
 
     public function testErrorMessages(): void
     {
-        $package = $this->getPackage();
+        $package = self::getPackage();
         $package->setDistUrl($distUrl = 'file://'.__FILE__);
 
         $io = $this->getMockBuilder('Composer\IO\IOInterface')->getMock();
@@ -66,7 +66,7 @@ class XzDownloaderTest extends TestCase
 
             $this->fail('Download of invalid tarball should throw an exception');
         } catch (\RuntimeException $e) {
-            $this->assertMatchesRegularExpression('/(File format not recognized|Unrecognized archive format)/i', $e->getMessage());
+            self::assertMatchesRegularExpression('/(File format not recognized|Unrecognized archive format)/i', $e->getMessage());
         }
     }
 }

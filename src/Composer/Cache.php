@@ -47,13 +47,13 @@ class Cache
      * @param Filesystem  $filesystem optional filesystem instance
      * @param bool        $readOnly   whether the cache is in readOnly mode
      */
-    public function __construct(IOInterface $io, string $cacheDir, string $allowlist = 'a-z0-9.', ?Filesystem $filesystem = null, bool $readOnly = false)
+    public function __construct(IOInterface $io, string $cacheDir, string $allowlist = 'a-z0-9._', ?Filesystem $filesystem = null, bool $readOnly = false)
     {
         $this->io = $io;
         $this->root = rtrim($cacheDir, '/\\') . '/';
         $this->allowlist = $allowlist;
         $this->filesystem = $filesystem ?: new Filesystem();
-        $this->readOnly = (bool) $readOnly;
+        $this->readOnly = $readOnly;
 
         if (!self::isUsable($cacheDir)) {
             $this->enabled = false;
@@ -65,7 +65,7 @@ class Cache
      */
     public function setReadOnly(bool $readOnly)
     {
-        $this->readOnly = (bool) $readOnly;
+        $this->readOnly = $readOnly;
     }
 
     /**
@@ -137,15 +137,25 @@ class Cache
      */
     public function write(string $file, string $contents)
     {
+        $wasEnabled = $this->enabled === true;
+
         if ($this->isEnabled() && !$this->readOnly) {
             $file = Preg::replace('{[^'.$this->allowlist.']}i', '-', $file);
 
             $this->io->writeError('Writing '.$this->root . $file.' into cache', true, IOInterface::DEBUG);
 
-            $tempFileName = $this->root . $file . uniqid('.', true) . '.tmp';
+            $tempFileName = $this->root . $file . bin2hex(random_bytes(5)) . '.tmp';
             try {
                 return file_put_contents($tempFileName, $contents) !== false && rename($tempFileName, $this->root . $file);
             } catch (\ErrorException $e) {
+                // If the write failed despite isEnabled checks passing earlier, rerun the isEnabled checks to
+                // see if they are still current and recreate the cache dir if needed. Refs https://github.com/composer/composer/issues/11076
+                if ($wasEnabled) {
+                    clearstatcache();
+                    $this->enabled = null;
+                    return $this->write($file, $contents);
+                }
+
                 $this->io->writeError('<warning>Failed to write into cache: '.$e->getMessage().'</warning>', true, IOInterface::DEBUG);
                 if (Preg::isMatch('{^file_put_contents\(\): Only ([0-9]+) of ([0-9]+) bytes written}', $e->getMessage(), $m)) {
                     // Remove partial file.
@@ -188,7 +198,7 @@ class Cache
                 $this->io->writeError('Writing '.$this->root . $file.' into cache from '.$source);
             }
 
-            return copy($source, $this->root . $file);
+            return $this->filesystem->copy($source, $this->root . $file);
         }
 
         return false;
@@ -214,7 +224,7 @@ class Cache
 
                 $this->io->writeError('Reading '.$this->root . $file.' from cache', true, IOInterface::DEBUG);
 
-                return copy($this->root . $file, $target);
+                return $this->filesystem->copy($this->root . $file, $target);
             }
         }
 
@@ -347,7 +357,7 @@ class Cache
         if ($this->isEnabled()) {
             $file = Preg::replace('{[^'.$this->allowlist.']}i', '-', $file);
             if (file_exists($this->root . $file)) {
-                return sha1_file($this->root . $file);
+                return hash_file('sha1', $this->root . $file);
             }
         }
 

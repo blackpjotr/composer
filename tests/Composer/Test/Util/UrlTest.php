@@ -22,13 +22,14 @@ class UrlTest extends TestCase
      * @dataProvider distRefsProvider
      *
      * @param array<string, mixed> $conf
+     * @param non-empty-string $url
      */
     public function testUpdateDistReference(string $url, string $expectedUrl, array $conf = [], string $ref = 'newref'): void
     {
         $config = new Config();
         $config->merge(['config' => $conf]);
 
-        $this->assertSame($expectedUrl, Url::updateDistReference($config, $url, $ref));
+        self::assertSame($expectedUrl, Url::updateDistReference($config, $url, $ref));
     }
 
     public static function distRefsProvider(): array
@@ -66,7 +67,7 @@ class UrlTest extends TestCase
      */
     public function testSanitize(string $expected, string $url): void
     {
-        $this->assertSame($expected, Url::sanitize($url));
+        self::assertSame($expected, Url::sanitize($url));
     }
 
     public static function sanitizeProvider(): array
@@ -81,6 +82,7 @@ class UrlTest extends TestCase
             ['https://example.org/foo/bar?access_token=***', 'https://example.org/foo/bar?access_token=abcdef'],
             ['https://example.org/foo/bar?foo=bar&access_token=***', 'https://example.org/foo/bar?foo=bar&access_token=abcdef'],
             ['https://***:***@github.com/acme/repo', 'https://ghp_1234567890abcdefghijklmnopqrstuvwxyzAB:x-oauth-basic@github.com/acme/repo'],
+            ['https://***:***@github.com/acme/repo', 'https://github_pat_1234567890abcdefghijkl_1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVW:x-oauth-basic@github.com/acme/repo'],
             // without scheme
             ['foo:***@example.org/', 'foo:bar@example.org/'],
             ['foo@example.org/', 'foo@example.org/'],

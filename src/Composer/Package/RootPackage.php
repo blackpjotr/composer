@@ -21,7 +21,7 @@ class RootPackage extends CompletePackage implements RootPackageInterface
 {
     public const DEFAULT_PRETTY_VERSION = '1.0.0+no-version-set';
 
-    /** @var string */
+    /** @var key-of<BasePackage::STABILITIES> */
     protected $minimumStability = 'stable';
     /** @var bool */
     protected $preferStable = false;
@@ -31,7 +31,7 @@ class RootPackage extends CompletePackage implements RootPackageInterface
     protected $config = [];
     /** @var array<string, string> Map of package name to reference/commit hash */
     protected $references = [];
-    /** @var array<array{package: string, version: string, alias: string, alias_normalized: string}> */
+    /** @var list<array{package: string, version: string, alias: string, alias_normalized: string}> */
     protected $aliases = [];
 
     /**

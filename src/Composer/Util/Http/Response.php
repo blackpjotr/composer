@@ -17,7 +17,7 @@ use Composer\Pcre\Preg;
 use Composer\Util\HttpDownloader;
 
 /**
- * @phpstan-import-type Request from HttpDownloader
+ * @phpstan-type Request array{url: non-empty-string, options?: mixed[], copyTo?: string|null}
  */
 class Response
 {
@@ -31,12 +31,12 @@ class Response
     private $body;
 
     /**
-     * @param Request      $request
+     * @param Request $request
      * @param list<string> $headers
      */
     public function __construct(array $request, ?int $code, array $headers, ?string $body)
     {
-        if (!isset($request['url'])) { // @phpstan-ignore-line
+        if (!isset($request['url'])) {
             throw new \LogicException('url key missing from request array');
         }
         $this->request = $request;
@@ -101,8 +101,7 @@ class Response
      */
     public function collect(): void
     {
-        /** @phpstan-ignore-next-line */
-        $this->request = $this->code = $this->headers = $this->body = null;
+        unset($this->request, $this->code, $this->headers, $this->body);
     }
 
     /**

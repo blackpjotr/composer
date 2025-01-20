@@ -11,6 +11,10 @@ static method) or any command-line executable command. Scripts are useful
 for executing a package's custom code or package-specific commands during
 the Composer execution process.
 
+As of Composer 2.5 scripts can also be Symfony Console Command classes,
+which allows you to easily run them including passing options. This is
+however not recommended for handling events.
+
 > **Note:** Only scripts defined in the root package's `composer.json` are
 > executed. If a dependency of the root package specifies its own scripts,
 > Composer does not execute those additional scripts.
@@ -94,8 +98,8 @@ For any given event:
 - Scripts execute in the order defined when their corresponding event is fired.
 - An array of scripts wired to a single event can contain both PHP callbacks
 and command-line executable commands.
-- PHP classes containing defined callbacks must be autoloadable via Composer's
-autoload functionality.
+- PHP classes and commands containing defined callbacks must be autoloadable
+via Composer's autoload functionality.
 - Callbacks can only autoload classes from psr-0, psr-4 and classmap
 definitions. If a defined callback relies on functions defined outside of a
 class, the callback itself is responsible for loading the file containing these
@@ -217,7 +221,9 @@ running `composer test`:
 ```json
 {
     "scripts": {
-        "test": "phpunit"
+        "test": "phpunit",
+        "do-something": "MyVendor\\MyClass::doSomething"
+        "my-cmd": "MyVendor\\MyCommand"
     }
 }
 ```
@@ -226,10 +232,62 @@ Similar to the `run-script` command you can give additional arguments to scripts
 e.g. `composer test -- --filter <pattern>` will pass `--filter <pattern>` along
 to the `phpunit` script.
 
+Using a PHP method via `composer do-something arg` lets you execute a
+`static function doSomething(\Composer\Script\Event $event)` and `arg` becomes
+available in `$event->getArguments()`. This however does not let you easily pass
+custom options in the form of `--flags`.
+
+Using a [symfony/console](https://packagist.org/packages/symfony/console) `Command`
+class you can define and access arguments and options more easily.
+
+For example with the command below you can then simply call `composer my-cmd
+--arbitrary-flag` without even the need for a `--` separator. To be detected
+as symfony/console commands the class name must end with `Command` and extend
+symfony's `Command` class. Also note that this will run using Composer's built-in
+symfony/console version which may not match the one you have required in your
+project, and may change between Composer minor releases. If you need more
+safety guarantees you should rather use your own binary file that runs your own
+symfony/console version in isolation in its own process then.
+
+```php
+<?php
+
+namespace MyVendor;
+
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\OutputInterface;
+
+class MyCommand extends Command
+{
+    protected function configure(): void
+    {
+        $this->setDefinition([
+            new InputOption('arbitrary-flag', null, InputOption::VALUE_NONE, 'Example flag'),
+            new InputArgument('foo', InputArgument::OPTIONAL, 'Optional arg'),
+        ]);
+    }
+
+    public function execute(InputInterface $input, OutputInterface $output): int
+    {
+        if ($input->getOption('arbitrary-flag')) {
+            $output->writeln('The flag was used');
+        }
+
+        return 0;
+    }
+}
+```
+
 > **Note:** Before executing scripts, Composer's bin-dir is temporarily pushed
 > on top of the PATH environment variable so that binaries of dependencies
 > are directly accessible. In this example no matter if the `phpunit` binary is
 > actually in `vendor/bin/phpunit` or `bin/phpunit` it will be found and executed.
+
+
+## Managing the process timeout
 
 Although Composer is not intended to manage long-running processes and other
 such aspects of PHP projects, it can sometimes be handy to disable the process
@@ -352,6 +410,40 @@ JSON array of commands.
 You can also call a shell/bash script, which will have the path to
 the PHP executable available in it as a `PHP_BINARY` env var.
 
+## Controlling additional arguments
+
+As of Composer 2.8, you can control how additional arguments are passed to script commands.
+
+When running scripts like `composer script-name arg arg2` or `composer script-name -- --option`,
+Composer will by default append `arg`, `arg2` and `--option` to the script's command.
+
+If you do not want these args in a given command, you can put `@no_additional_args`
+anywhere in it, that will remove the default behavior and that flag will be removed
+as well before running the command.
+
+If you want the args to be added somewhere else than at the very end, then you can put
+`@additional_args` to be able to choose exactly where they go.
+
+For example running `composer run-commands ARG` with the below config:
+
+```json
+{
+    "scripts": {
+        "run-commands": [
+            "echo hello @no_additional_args",
+            "command-with-args @additional_args && do-something-without-args --here"
+        ]
+    }
+}
+```
+
+Would end up executing these commands:
+
+```
+echo hello
+command-with-args ARG && do-something-without-args --here
+```
+
 ## Setting environment variables
 
 To set an environment variable in a cross-platform way, you can use `@putenv`:
@@ -361,13 +453,13 @@ To set an environment variable in a cross-platform way, you can use `@putenv`:
     "scripts": {
         "install-phpstan": [
             "@putenv COMPOSER=phpstan-composer.json",
-            "composer install --prefer-dist"
+            "@composer install --prefer-dist"
         ]
     }
 }
 ```
 
-## Custom descriptions.
+## Custom descriptions
 
 You can set custom script descriptions with the following in your `composer.json`:
 
@@ -383,3 +475,19 @@ The descriptions are used in `composer list` or `composer run -l` commands to
 describe what the scripts do when the command is run.
 
 > **Note:** You can only set custom descriptions of custom commands.
+
+## Custom aliases
+
+As of Composer 2.7, you can set custom script aliases with the following in your `composer.json`:
+
+```json
+{
+    "scripts-aliases": {
+        "phpstan": ["stan", "analyze"]
+    }
+}
+```
+
+The aliases provide alternate command names.
+
+> **Note:** You can only set custom aliases of custom commands.

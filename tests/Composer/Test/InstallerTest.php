@@ -59,6 +59,7 @@ class InstallerTest extends TestCase
     {
         parent::tearDown();
         Platform::clearEnv('COMPOSER_POOL_OPTIMIZER');
+        Platform::clearEnv('COMPOSER_FUND');
 
         chdir($this->prevCwd);
         if (isset($this->tempComposerHome) && is_dir($this->tempComposerHome)) {
@@ -102,9 +103,6 @@ class InstallerTest extends TestCase
         $repositoryManager = new RepositoryManager($io, $config, $httpDownloader, $eventDispatcher);
         $repositoryManager->setLocalRepository(new InstalledArrayRepository());
 
-        if (!is_array($repositories)) {
-            $repositories = [$repositories];
-        }
         foreach ($repositories as $repository) {
             $repositoryManager->addRepository($repository);
         }
@@ -140,20 +138,20 @@ class InstallerTest extends TestCase
         $result = $installer->run();
 
         $output = str_replace("\r", '', $io->getOutput());
-        $this->assertEquals(0, $result, $output);
+        self::assertEquals(0, $result, $output);
 
         $expectedInstalled = $options['install'] ?? [];
         $expectedUpdated = $options['update'] ?? [];
         $expectedUninstalled = $options['uninstall'] ?? [];
 
         $installed = $installationManager->getInstalledPackages();
-        $this->assertEquals($this->makePackagesComparable($expectedInstalled), $this->makePackagesComparable($installed));
+        self::assertEquals($this->makePackagesComparable($expectedInstalled), $this->makePackagesComparable($installed));
 
         $updated = $installationManager->getUpdatedPackages();
-        $this->assertSame($expectedUpdated, $updated);
+        self::assertSame($expectedUpdated, $updated);
 
         $uninstalled = $installationManager->getUninstalledPackages();
-        $this->assertSame($expectedUninstalled, $uninstalled);
+        self::assertSame($expectedUninstalled, $uninstalled);
     }
 
     /**
@@ -172,20 +170,20 @@ class InstallerTest extends TestCase
         return $comparable;
     }
 
-    public function provideInstaller(): array
+    public static function provideInstaller(): array
     {
         $cases = [];
 
         // when A requires B and B requires A, and A is a non-published root package
         // the install of B should succeed
 
-        $a = $this->getPackage('A', '1.0.0', 'Composer\Package\RootPackage');
+        $a = self::getPackage('A', '1.0.0', 'Composer\Package\RootPackage');
         $a->setRequires([
-            'b' => new Link('A', 'B', $v = $this->getVersionConstraint('=', '1.0.0'), Link::TYPE_REQUIRE, $v->getPrettyString()),
+            'b' => new Link('A', 'B', $v = self::getVersionConstraint('=', '1.0.0'), Link::TYPE_REQUIRE, $v->getPrettyString()),
         ]);
-        $b = $this->getPackage('B', '1.0.0');
+        $b = self::getPackage('B', '1.0.0');
         $b->setRequires([
-            'a' => new Link('B', 'A', $v = $this->getVersionConstraint('=', '1.0.0'), Link::TYPE_REQUIRE, $v->getPrettyString()),
+            'a' => new Link('B', 'A', $v = self::getVersionConstraint('=', '1.0.0'), Link::TYPE_REQUIRE, $v->getPrettyString()),
         ]);
 
         $cases[] = [
@@ -199,13 +197,13 @@ class InstallerTest extends TestCase
         // #480: when A requires B and B requires A, and A is a published root package
         // only B should be installed, as A is the root
 
-        $a = $this->getPackage('A', '1.0.0', 'Composer\Package\RootPackage');
+        $a = self::getPackage('A', '1.0.0', 'Composer\Package\RootPackage');
         $a->setRequires([
-            'b' => new Link('A', 'B', $v = $this->getVersionConstraint('=', '1.0.0'), Link::TYPE_REQUIRE, $v->getPrettyString()),
+            'b' => new Link('A', 'B', $v = self::getVersionConstraint('=', '1.0.0'), Link::TYPE_REQUIRE, $v->getPrettyString()),
         ]);
-        $b = $this->getPackage('B', '1.0.0');
+        $b = self::getPackage('B', '1.0.0');
         $b->setRequires([
-            'a' => new Link('B', 'A', $v = $this->getVersionConstraint('=', '1.0.0'), Link::TYPE_REQUIRE, $v->getPrettyString()),
+            'a' => new Link('B', 'A', $v = self::getVersionConstraint('=', '1.0.0'), Link::TYPE_REQUIRE, $v->getPrettyString()),
         ]);
 
         $cases[] = [
@@ -281,7 +279,7 @@ class InstallerTest extends TestCase
     {
         if ($condition) {
             eval('$res = '.$condition.';');
-            if (!$res) { // @phpstan-ignore-line
+            if (!$res) { // @phpstan-ignore variable.undefined
                 $this->markTestSkipped($condition);
             }
         }
@@ -335,7 +333,7 @@ class InstallerTest extends TestCase
                 ->method('write')
                 ->will($this->returnCallback(static function ($hash, $options) use (&$actualLock): void {
                     // need to do assertion outside of mock for nice phpunit output
-                    // so store value temporarily in reference for later assetion
+                    // so store value temporarily in reference for later assertion
                     $actualLock = $hash;
                 }));
         } elseif ($expectLock === false) {
@@ -384,6 +382,7 @@ class InstallerTest extends TestCase
         $update->addOption('lock', null, InputOption::VALUE_NONE);
         $update->addOption('with-all-dependencies', null, InputOption::VALUE_NONE);
         $update->addOption('with-dependencies', null, InputOption::VALUE_NONE);
+        $update->addOption('minimal-changes', null, InputOption::VALUE_NONE);
         $update->addOption('prefer-stable', null, InputOption::VALUE_NONE);
         $update->addOption('prefer-lowest', null, InputOption::VALUE_NONE);
         $update->addArgument('packages', InputArgument::IS_ARRAY | InputArgument::OPTIONAL);
@@ -415,7 +414,8 @@ class InstallerTest extends TestCase
                 ->setPreferStable($input->getOption('prefer-stable'))
                 ->setPreferLowest($input->getOption('prefer-lowest'))
                 ->setPlatformRequirementFilter(PlatformRequirementFilterFactory::fromBoolOrList($ignorePlatformReqs))
-                ->setAudit(false);
+                ->setAudit(false)
+                ->setMinimalUpdate($input->getOption('minimal-changes'));
 
             return $installer->run();
         });
@@ -441,10 +441,15 @@ class InstallerTest extends TestCase
         }
 
         $output = str_replace("\r", '', $io->getOutput());
-        $this->assertEquals($expectResult, $result, $output . stream_get_contents($appOutput));
+        self::assertEquals($expectResult, $result, $output . stream_get_contents($appOutput));
         if ($expectLock && isset($actualLock)) {
             unset($actualLock['hash'], $actualLock['content-hash'], $actualLock['_readme'], $actualLock['plugin-api-version']);
-            $this->assertEquals($expectLock, $actualLock);
+            foreach (['stability-flags', 'platform', 'platform-dev'] as $key) {
+                if ($expectLock[$key] === []) {
+                    $expectLock[$key] = new \stdClass;
+                }
+            }
+            self::assertEquals($expectLock, $actualLock);
         }
 
         if ($expectInstalled !== null) {
@@ -461,37 +466,37 @@ class InstallerTest extends TestCase
                 return strcmp($a['name'], $b['name']);
             });
 
-            $this->assertSame($expectInstalled, $actualInstalled);
+            self::assertSame($expectInstalled, $actualInstalled);
         }
 
         /** @var InstallationManagerMock $installationManager */
         $installationManager = $composer->getInstallationManager();
-        $this->assertSame(rtrim($expect), implode("\n", $installationManager->getTrace()));
+        self::assertSame(rtrim($expect), implode("\n", $installationManager->getTrace()));
 
         if ($expectOutput) {
             $output = Preg::replace('{^    - .*?\.ini$}m', '__inilist__', $output);
             $output = Preg::replace('{(__inilist__\r?\n)+}', "__inilist__\n", $output);
 
-            $this->assertStringMatchesFormat(rtrim($expectOutput), rtrim($output));
+            self::assertStringMatchesFormat(rtrim($expectOutput), rtrim($output));
         }
     }
 
-    public function provideSlowIntegrationTests(): array
+    public static function provideSlowIntegrationTests(): array
     {
-        return $this->loadIntegrationTests('installer-slow/');
+        return self::loadIntegrationTests('installer-slow/');
     }
 
-    public function provideIntegrationTests(): array
+    public static function provideIntegrationTests(): array
     {
-        return $this->loadIntegrationTests('installer/');
+        return self::loadIntegrationTests('installer/');
     }
 
     /**
      * @return mixed[]
      */
-    public function loadIntegrationTests(string $path): array
+    public static function loadIntegrationTests(string $path): array
     {
-        $fixturesDir = realpath(__DIR__.'/Fixtures/'.$path);
+        $fixturesDir = (string) realpath(__DIR__.'/Fixtures/'.$path);
         $tests = [];
 
         foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($fixturesDir), \RecursiveIteratorIterator::LEAVES_ONLY) as $file) {
@@ -502,7 +507,7 @@ class InstallerTest extends TestCase
             }
 
             try {
-                $testData = $this->readTestFile($file, $fixturesDir);
+                $testData = self::readTestFile($file, $fixturesDir);
 
                 $installed = [];
                 $installedDev = [];
@@ -533,7 +538,7 @@ class InstallerTest extends TestCase
                 if (!empty($testData['LOCK'])) {
                     $lock = JsonFile::parseJson($testData['LOCK']);
                     if (!isset($lock['hash'])) {
-                        $lock['hash'] = md5(JsonFile::encode($composer, 0));
+                        $lock['hash'] = hash('md5', JsonFile::encode($composer, 0));
                     }
                 }
                 if (!empty($testData['INSTALLED'])) {
@@ -576,7 +581,7 @@ class InstallerTest extends TestCase
     /**
      * @return mixed[]
      */
-    protected function readTestFile(string $file, string $fixturesDir): array
+    protected static function readTestFile(string $file, string $fixturesDir): array
     {
         $tokens = Preg::split('#(?:^|\n*)--([A-Z-]+)--\n#', file_get_contents($file), -1, PREG_SPLIT_DELIM_CAPTURE);
 

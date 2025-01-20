@@ -24,13 +24,14 @@ final class IgnoreNothingPlatformRequirementFilterTest extends TestCase
     {
         $platformRequirementFilter = new IgnoreNothingPlatformRequirementFilter();
 
-        $this->assertFalse($platformRequirementFilter->isIgnored($req)); // @phpstan-ignore-line
+        self::assertFalse($platformRequirementFilter->isIgnored($req));
+        self::assertFalse($platformRequirementFilter->isUpperBoundIgnored($req));
     }
 
     /**
      * @return array<string, mixed[]>
      */
-    public function dataIsIgnored(): array
+    public static function dataIsIgnored(): array
     {
         return [
             'php is not ignored' => ['php'],

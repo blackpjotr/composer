@@ -16,6 +16,7 @@ use Composer\IO\NullIO;
 use Composer\Json\JsonFile;
 use Composer\Repository\ComposerRepository;
 use Composer\Repository\RepositoryInterface;
+use Composer\Semver\Constraint\Constraint;
 use Composer\Test\Mock\FactoryMock;
 use Composer\Test\TestCase;
 use Composer\Package\Loader\ArrayLoader;
@@ -54,14 +55,14 @@ class ComposerRepositoryTest extends TestCase
         $packages = $repository->getPackages();
 
         // Final sanity check, ensure the correct number of packages were added.
-        $this->assertCount(count($expected), $packages);
+        self::assertCount(count($expected), $packages);
 
         foreach ($expected as $index => $pkg) {
             self::assertSame($pkg['name'].' '.$pkg['version'], $packages[$index]->getName().' '.$packages[$index]->getPrettyVersion());
         }
     }
 
-    public function loadDataProvider(): array
+    public static function loadDataProvider(): array
     {
         return [
             // Old repository format
@@ -86,6 +87,19 @@ class ComposerRepositoryTest extends TestCase
                     'bar/foo' => [
                         '3.14' => ['name' => 'bar/foo', 'version' => '3.14'],
                         '3.145' => ['name' => 'bar/foo', 'version' => '3.145'],
+                    ],
+                ]],
+            ],
+            // New repository format but without versions as keys should also be supported
+            [
+                [
+                    ['name' => 'bar/foo', 'version' => '3.14'],
+                    ['name' => 'bar/foo', 'version' => '3.145'],
+                ],
+                ['packages' => [
+                    'bar/foo' => [
+                        ['name' => 'bar/foo', 'version' => '3.14'],
+                        ['name' => 'bar/foo', 'version' => '3.145'],
                     ],
                 ]],
             ],
@@ -147,13 +161,13 @@ class ComposerRepositoryTest extends TestCase
                 ],
             ]));
 
-        $reflMethod = new \ReflectionMethod($repo, 'whatProvides');
+        $reflMethod = new \ReflectionMethod(ComposerRepository::class, 'whatProvides');
         $reflMethod->setAccessible(true);
         $packages = $reflMethod->invoke($repo, 'a');
 
-        $this->assertCount(5, $packages);
-        $this->assertEquals(['1', '1-alias', '2', '2-alias', '3'], array_keys($packages));
-        $this->assertSame($packages['2'], $packages['2-alias']->getAliasOf());
+        self::assertCount(5, $packages);
+        self::assertEquals(['1', '1-alias', '2', '2-alias', '3'], array_keys($packages));
+        self::assertSame($packages['2'], $packages['2-alias']->getAliasOf());
     }
 
     public function testSearchWithType(): void
@@ -188,12 +202,12 @@ class ComposerRepositoryTest extends TestCase
         $config->merge(['config' => ['cache-read-only' => true]]);
         $repository = new ComposerRepository($repoConfig, new NullIO, $config, $httpDownloader, $eventDispatcher);
 
-        $this->assertSame(
+        self::assertSame(
             [['name' => 'foo', 'description' => null]],
             $repository->search('foo', RepositoryInterface::SEARCH_FULLTEXT, 'composer-plugin')
         );
 
-        $this->assertEmpty(
+        self::assertEmpty(
             $repository->search('foo', RepositoryInterface::SEARCH_FULLTEXT, 'library')
         );
     }
@@ -220,7 +234,7 @@ class ComposerRepositoryTest extends TestCase
         $config->merge(['config' => ['cache-read-only' => true]]);
         $repository = new ComposerRepository($repoConfig, new NullIO, $config, $httpDownloader, $eventDispatcher);
 
-        $this->assertEmpty(
+        self::assertEmpty(
             $repository->search('foo bar', RepositoryInterface::SEARCH_FULLTEXT)
         );
     }
@@ -263,7 +277,7 @@ class ComposerRepositoryTest extends TestCase
         $config->merge(['config' => ['cache-read-only' => true]]);
         $repository = new ComposerRepository($repoConfig, new NullIO, $config, $httpDownloader, $eventDispatcher);
 
-        $this->assertSame(
+        self::assertSame(
             [
                 ['name' => 'foo1', 'description' => null, 'abandoned' => true],
                 ['name' => 'foo2', 'description' => null, 'abandoned' => 'bar'],
@@ -274,6 +288,8 @@ class ComposerRepositoryTest extends TestCase
 
     /**
      * @dataProvider provideCanonicalizeUrlTestCases
+     * @param non-empty-string $url
+     * @param non-empty-string $repositoryUrl
      */
     public function testCanonicalizeUrl(string $expected, string $url, string $repositoryUrl): void
     {
@@ -296,10 +312,10 @@ class ComposerRepositoryTest extends TestCase
         $property->setAccessible(true);
         $property->setValue($repository, $repositoryUrl);
 
-        $this->assertSame($expected, $method->invoke($repository, $url));
+        self::assertSame($expected, $method->invoke($repository, $url));
     }
 
-    public function provideCanonicalizeUrlTestCases(): array
+    public static function provideCanonicalizeUrlTestCases(): array
     {
         return [
             [
@@ -363,6 +379,55 @@ class ComposerRepositoryTest extends TestCase
             $httpDownloader
         );
 
-        $this->assertEquals(['foo/bar'], $repository->getPackageNames());
+        self::assertEquals(['foo/bar'], $repository->getPackageNames());
+    }
+
+    public function testGetSecurityAdvisoriesAssertRepositoryHttpOptionsAreUsed(): void
+    {
+        $httpDownloader = $this->getHttpDownloaderMock();
+        $httpDownloader->expects(
+            [
+                [
+                    'url' => 'https://example.org/packages.json',
+                    'body' => JsonFile::encode([
+                        'packages' => ['foo/bar' => [
+                            'dev-branch' => ['name' => 'foo/bar'],
+                            'v1.0.0' => ['name' => 'foo/bar'],
+                        ]],
+                        'metadata-url' => 'https://example.org/p2/%package%.json',
+                        'security-advisories' => [
+                            'api-url' => 'https://example.org/security-advisories',
+                        ],
+                    ]),
+                    'options' => ['http' => ['verify_peer' => false]],
+                ],
+                [
+                    'url' => 'https://example.org/security-advisories',
+                    'body' => JsonFile::encode(['advisories' => []]),
+                    'options' => ['http' => [
+                        'verify_peer' => false,
+                        'method' => 'POST',
+                        'header' => [
+                            'Content-type: application/x-www-form-urlencoded',
+                        ],
+                        'timeout' => 10,
+                        'content' => http_build_query(['packages' => ['foo/bar']]),
+                    ]],
+                ]
+            ],
+            true
+        );
+
+        $repository = new ComposerRepository(
+            ['url' => 'https://example.org/packages.json', 'options' => ['http' => ['verify_peer' => false]]],
+            new NullIO(),
+            FactoryMock::createConfig(),
+            $httpDownloader
+        );
+
+        self::assertSame([
+            'namesFound' => [],
+            'advisories' => [],
+        ], $repository->getSecurityAdvisories(['foo/bar' => new Constraint('=', '1.0.0.0')]));
     }
 }

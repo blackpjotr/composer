@@ -26,12 +26,12 @@ use Symfony\Component\Console\Input\InputArgument as BaseInputArgument;
  *
  * @internal
  *
- * TODO drop when PHP 8.1 / symfony 6.1+ can be required
+ * TODO symfony/console:6.1 drop when PHP 8.1 / symfony 6.1+ can be required
  */
 class InputArgument extends BaseInputArgument
 {
     /**
-     * @var string[]|\Closure(CompletionInput,CompletionSuggestions):list<string|Suggestion>
+     * @var list<string>|\Closure(CompletionInput,CompletionSuggestions):list<string|Suggestion>
      */
     private $suggestedValues;
 
@@ -40,7 +40,7 @@ class InputArgument extends BaseInputArgument
      * @param int|null                            $mode        The argument mode: self::REQUIRED or self::OPTIONAL
      * @param string                              $description A description text
      * @param string|bool|int|float|string[]|null $default     The default value (for self::OPTIONAL mode only)
-     * @param string[]|\Closure(CompletionInput,CompletionSuggestions):list<string|Suggestion> $suggestedValues The values used for input completion
+     * @param list<string>|\Closure(CompletionInput,CompletionSuggestions):list<string|Suggestion> $suggestedValues The values used for input completion
      *
      * @throws InvalidArgumentException When argument mode is not valid
      */
@@ -59,7 +59,7 @@ class InputArgument extends BaseInputArgument
     public function complete(CompletionInput $input, CompletionSuggestions $suggestions): void
     {
         $values = $this->suggestedValues;
-        if ($values instanceof \Closure && !\is_array($values = $values($input, $suggestions))) { // @phpstan-ignore-line
+        if ($values instanceof \Closure && !\is_array($values = $values($input, $suggestions))) { // @phpstan-ignore function.impossibleType
             throw new LogicException(sprintf('Closure for option "%s" must return an array. Got "%s".', $this->getName(), get_debug_type($values)));
         }
         if ([] !== $values) {

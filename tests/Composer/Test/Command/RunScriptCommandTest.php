@@ -105,12 +105,110 @@ class RunScriptCommandTest extends TestCase
 
         $output = $appTester->getDisplay();
 
-        $this->assertStringContainsString('Runs the test script as defined in composer.json', $output, 'The default description for the test script should be printed');
-        $this->assertStringContainsString('Run the codestyle fixer', $output, 'The custom description for the fix-cs script should be printed');
+        self::assertStringContainsString('Runs the test script as defined in composer.json', $output, 'The default description for the test script should be printed');
+        self::assertStringContainsString('Run the codestyle fixer', $output, 'The custom description for the fix-cs script should be printed');
+    }
+
+    public function testCanDefineAliases(): void
+    {
+        $expectedAliases = ['one', 'two', 'three'];
+
+        $this->initTempComposer([
+            'scripts' => [
+                'test' => '@php test',
+            ],
+            'scripts-aliases' => [
+                'test' => $expectedAliases,
+            ],
+        ]);
+
+        $appTester = $this->getApplicationTester();
+        $appTester->run(['command' => 'test', '--help' => true, '--format' => 'json']);
+
+        $appTester->assertCommandIsSuccessful();
+
+        $output = $appTester->getDisplay();
+        $array = json_decode($output, true);
+        $actualAliases = $array['usage'];
+        array_shift($actualAliases);
+
+        self::assertSame($expectedAliases, $actualAliases, 'The custom aliases for the test command should be printed');
+    }
+
+    public function testExecutionOfCustomSymfonyCommand(): void
+    {
+        $this->initTempComposer([
+            'scripts' => [
+                'test-direct' => 'Test\\MyCommand',
+                'test-ref' => ['@test-direct --inneropt innerarg'],
+            ],
+            'autoload' => [
+                'psr-4' => [
+                    'Test\\' => '',
+                ],
+            ],
+        ]);
+
+        file_put_contents('MyCommand.php', <<<'TEST'
+<?php
+
+namespace Test;
+
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Command\Command;
+
+class MyCommand extends Command
+{
+    protected function configure(): void
+    {
+        $this->setDefinition([
+            new InputArgument('req-arg', InputArgument::REQUIRED, 'Required arg.'),
+            new InputArgument('opt-arg', InputArgument::OPTIONAL, 'Optional arg.'),
+            new InputOption('inneropt', null, InputOption::VALUE_NONE, 'Option.'),
+            new InputOption('outeropt', null, InputOption::VALUE_OPTIONAL, 'Optional option.'),
+        ]);
+    }
+
+    public function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $output->writeln($input->getArgument('req-arg'));
+        $output->writeln((string) $input->getArgument('opt-arg'));
+        $output->writeln('inneropt: '.($input->getOption('inneropt') ? 'set' : 'unset'));
+        $output->writeln('outeropt: '.($input->getOption('outeropt') ? 'set' : 'unset'));
+
+        return 2;
+    }
+}
+
+TEST
+);
+
+        $appTester = $this->getApplicationTester();
+        $appTester->run(['command' => 'test-direct', '--outeropt' => true, 'req-arg' => 'lala']);
+
+        self::assertSame('lala
+
+inneropt: unset
+outeropt: set
+', $appTester->getDisplay(true));
+        self::assertSame(2, $appTester->getStatusCode());
+
+        $appTester = $this->getApplicationTester();
+        $appTester->run(['command' => 'test-ref', '--outeropt' => true, 'req-arg' => 'lala']);
+
+        self::assertSame('innerarg
+lala
+inneropt: set
+outeropt: set
+', $appTester->getDisplay(true));
+        self::assertSame(2, $appTester->getStatusCode());
     }
 
     /** @return bool[][] **/
-    public function getDevOptions(): array
+    public static function getDevOptions(): array
     {
         return [
             [true, true],

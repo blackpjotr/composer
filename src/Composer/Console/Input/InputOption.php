@@ -26,12 +26,12 @@ use Symfony\Component\Console\Input\InputOption as BaseInputOption;
  *
  * @internal
  *
- * TODO drop when PHP 8.1 / symfony 6.1+ can be required
+ * TODO symfony/console:6.1 drop when PHP 8.1 / symfony 6.1+ can be required
  */
 class InputOption extends BaseInputOption
 {
     /**
-     * @var string[]|\Closure(CompletionInput,CompletionSuggestions):list<string|Suggestion>
+     * @var list<string>|\Closure(CompletionInput,CompletionSuggestions):list<string|Suggestion>
      */
     private $suggestedValues;
 
@@ -39,7 +39,7 @@ class InputOption extends BaseInputOption
      * @param string|string[]|null                $shortcut The shortcuts, can be null, a string of shortcuts delimited by | or an array of shortcuts
      * @param int|null                            $mode     The option mode: One of the VALUE_* constants
      * @param string|bool|int|float|string[]|null $default  The default value (must be null for self::VALUE_NONE)
-     * @param string[]|\Closure(CompletionInput,CompletionSuggestions):list<string|Suggestion> $suggestedValues The values used for input completionnull for self::VALUE_NONE)
+     * @param list<string>|\Closure(CompletionInput,CompletionSuggestions):list<string|Suggestion> $suggestedValues The values used for input completionnull for self::VALUE_NONE)
      *
      * @throws InvalidArgumentException If option mode is invalid or incompatible
      */
@@ -62,7 +62,7 @@ class InputOption extends BaseInputOption
     public function complete(CompletionInput $input, CompletionSuggestions $suggestions): void
     {
         $values = $this->suggestedValues;
-        if ($values instanceof \Closure && !\is_array($values = $values($input, $suggestions))) { // @phpstan-ignore-line
+        if ($values instanceof \Closure && !\is_array($values = $values($input, $suggestions))) { // @phpstan-ignore function.impossibleType
             throw new LogicException(sprintf('Closure for argument "%s" must return an array. Got "%s".', $this->getName(), get_debug_type($values)));
         }
         if ([] !== $values) {

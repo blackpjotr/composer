@@ -38,7 +38,7 @@ trait CompletionTrait
     /**
      * Suggestion values for "prefer-install" option
      *
-     * @return string[]
+     * @return list<string>
      */
     private function suggestPreferInstall(): array
     {
@@ -114,6 +114,36 @@ trait CompletionTrait
                 }, $installedRepo->getPackages()),
                 $platformHint
             );
+        };
+    }
+
+    /**
+     * Suggest package names from installed.
+     */
+    private function suggestInstalledPackageTypes(bool $includeRootPackage = true): \Closure
+    {
+        return function (CompletionInput $input) use ($includeRootPackage): array {
+            $composer = $this->requireComposer();
+            $installedRepos = [];
+
+            if ($includeRootPackage) {
+                $installedRepos[] = new RootPackageRepository(clone $composer->getPackage());
+            }
+
+            $locker = $composer->getLocker();
+            if ($locker->isLocked()) {
+                $installedRepos[] = $locker->getLockedRepository(true);
+            } else {
+                $installedRepos[] = $composer->getRepositoryManager()->getLocalRepository();
+            }
+
+            $installedRepo = new InstalledRepository($installedRepos);
+
+            return array_values(array_unique(
+                array_map(static function (PackageInterface $package) {
+                    return $package->getType();
+                }, $installedRepo->getPackages())
+            ));
         };
     }
 

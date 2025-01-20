@@ -57,16 +57,16 @@ class ProcessExecutorMock extends ProcessExecutor
     }
 
     /**
-     * @param array<string|array{cmd: string|list<string>, return?: int, stdout?: string, stderr?: string, callback?: callable}> $expectations
+     * @param array<string|non-empty-list<string>|array{cmd: string|non-empty-list<string>, return?: int, stdout?: string, stderr?: string, callback?: callable}> $expectations
      * @param bool                                                                                                               $strict         set to true if you want to provide *all* expected commands, and not just a subset you are interested in testing
      * @param array{return: int, stdout?: string, stderr?: string}                                                               $defaultHandler default command handler for undefined commands if not in strict mode
      */
     public function expects(array $expectations, bool $strict = false, array $defaultHandler = ['return' => 0, 'stdout' => '', 'stderr' => '']): void
     {
-        /** @var array{cmd: string|list<string>, return: int, stdout: string, stderr: string, callback: callable} $default */
+        /** @var array{cmd: string|non-empty-list<string>, return: int, stdout: string, stderr: string, callback: callable|null} $default */
         $default = ['cmd' => '', 'return' => 0, 'stdout' => '', 'stderr' => '', 'callback' => null];
         $this->expectations = array_map(static function ($expect) use ($default): array {
-            if (is_string($expect)) {
+            if (is_string($expect) || array_is_list($expect)) {
                 $command = $expect;
                 $expect = $default;
                 $expect['cmd'] = $command;
@@ -74,23 +74,11 @@ class ProcessExecutorMock extends ProcessExecutor
                 throw new \UnexpectedValueException('Unexpected keys in process execution step: '.implode(', ', array_keys($diff)));
             }
 
-            // set defaults in a PHPStan-happy way (array_merge is not well supported)
-            $expect['cmd'] = $expect['cmd'] ?? $default['cmd'];
-            $expect['return'] = $expect['return'] ?? $default['return'];
-            $expect['stdout'] = $expect['stdout'] ?? $default['stdout'];
-            $expect['stderr'] = $expect['stderr'] ?? $default['stderr'];
-            $expect['callback'] = $expect['callback'] ?? $default['callback'];
-
-            return $expect;
+            return array_merge($default, $expect);
         }, $expectations);
         $this->strict = $strict;
 
-        // set defaults in a PHPStan-happy way (array_merge is not well supported)
-        $defaultHandler['return'] = $defaultHandler['return'] ?? $this->defaultHandler['return'];
-        $defaultHandler['stdout'] = $defaultHandler['stdout'] ?? $this->defaultHandler['stdout'];
-        $defaultHandler['stderr'] = $defaultHandler['stderr'] ?? $this->defaultHandler['stderr'];
-
-        $this->defaultHandler = $defaultHandler;
+        $this->defaultHandler = array_merge($this->defaultHandler, $defaultHandler);
     }
 
     public function assertComplete(): void
@@ -112,7 +100,7 @@ class ProcessExecutorMock extends ProcessExecutor
         }
 
         // dummy assertion to ensure the test is not marked as having no assertions
-        Assert::assertTrue(true); // @phpstan-ignore-line
+        Assert::assertTrue(true); // @phpstan-ignore staticMethod.alreadyNarrowedType
     }
 
     public function execute($command, &$output = null, ?string $cwd = null): int

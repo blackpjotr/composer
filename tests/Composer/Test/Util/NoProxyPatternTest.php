@@ -24,10 +24,10 @@ class NoProxyPatternTest extends TestCase
     {
         $matcher = new NoProxyPattern($noproxy);
         $url = $this->getUrl($url);
-        $this->assertEquals($expected, $matcher->test($url));
+        self::assertEquals($expected, $matcher->test($url));
     }
 
-    public function dataHostName(): array
+    public static function dataHostName(): array
     {
         $noproxy = 'foobar.com, .barbaz.net';
 
@@ -51,10 +51,10 @@ class NoProxyPatternTest extends TestCase
     {
         $matcher = new NoProxyPattern($noproxy);
         $url = $this->getUrl($url);
-        $this->assertEquals($expected, $matcher->test($url));
+        self::assertEquals($expected, $matcher->test($url));
     }
 
-    public function dataIpAddress(): array
+    public static function dataIpAddress(): array
     {
         $noproxy = '192.168.1.1, 2001:db8::52:0:1';
 
@@ -76,10 +76,10 @@ class NoProxyPatternTest extends TestCase
     {
         $matcher = new NoProxyPattern($noproxy);
         $url = $this->getUrl($url);
-        $this->assertEquals($expected, $matcher->test($url));
+        self::assertEquals($expected, $matcher->test($url));
     }
 
-    public function dataIpRange(): array
+    public static function dataIpRange(): array
     {
         $noproxy = '10.0.0.0/30, 2002:db8:a::45/121';
 
@@ -101,10 +101,10 @@ class NoProxyPatternTest extends TestCase
     {
         $matcher = new NoProxyPattern($noproxy);
         $url = $this->getUrl($url);
-        $this->assertEquals($expected, $matcher->test($url));
+        self::assertEquals($expected, $matcher->test($url));
     }
 
-    public function dataPort(): array
+    public static function dataPort(): array
     {
         $noproxy = '192.168.1.2:81, 192.168.1.3:80, [2001:db8::52:0:2]:443, [2001:db8::52:0:3]:80';
 

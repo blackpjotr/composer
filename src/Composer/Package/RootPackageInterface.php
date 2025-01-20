@@ -27,12 +27,14 @@ interface RootPackageInterface extends CompletePackageInterface
     /**
      * Returns a set of package names and their aliases
      *
-     * @return array<array{package: string, version: string, alias: string, alias_normalized: string}>
+     * @return list<array{package: string, version: string, alias: string, alias_normalized: string}>
      */
     public function getAliases(): array;
 
     /**
      * Returns the minimum stability of the package
+     *
+     * @return key-of<BasePackage::STABILITIES>
      */
     public function getMinimumStability(): string;
 
@@ -120,12 +122,14 @@ interface RootPackageInterface extends CompletePackageInterface
     /**
      * Set the stabilityFlags
      *
-     * @param array<string, BasePackage::STABILITY_*> $stabilityFlags
+     * @phpstan-param array<string, BasePackage::STABILITY_*> $stabilityFlags
      */
     public function setStabilityFlags(array $stabilityFlags): void;
 
     /**
      * Set the minimumStability
+     *
+     * @phpstan-param key-of<BasePackage::STABILITIES> $minimumStability
      */
     public function setMinimumStability(string $minimumStability): void;
 
@@ -151,7 +155,7 @@ interface RootPackageInterface extends CompletePackageInterface
     /**
      * Set the aliases
      *
-     * @param array<array{package: string, version: string, alias: string, alias_normalized: string}> $aliases
+     * @param list<array{package: string, version: string, alias: string, alias_normalized: string}> $aliases
      */
     public function setAliases(array $aliases): void;
 

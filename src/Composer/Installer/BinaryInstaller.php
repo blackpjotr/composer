@@ -140,7 +140,7 @@ class BinaryInstaller
         $handle = fopen($bin, 'r');
         $line = fgets($handle);
         fclose($handle);
-        if (Preg::isMatch('{^#!/(?:usr/bin/env )?(?:[^/]+/)*(.+)$}m', $line, $match)) {
+        if (Preg::isMatchStrictGroups('{^#!/(?:usr/bin/env )?(?:[^/]+/)*(.+)$}m', (string) $line, $match)) {
             return trim($match[1]);
         }
 
@@ -213,19 +213,24 @@ class BinaryInstaller
         $binDir = ProcessExecutor::escape(dirname($binPath));
         $binFile = basename($binPath);
 
-        $binContents = file_get_contents($bin);
+        $binContents = (string) file_get_contents($bin, false, null, 0, 500);
         // For php files, we generate a PHP proxy instead of a shell one,
         // which allows calling the proxy with a custom php process
         if (Preg::isMatch('{^(#!.*\r?\n)?[\r\n\t ]*<\?php}', $binContents, $match)) {
             // carry over the existing shebang if present, otherwise add our own
-            $proxyCode = empty($match[1]) ? '#!/usr/bin/env php' : trim($match[1]);
+            $proxyCode = $match[1] === null ? '#!/usr/bin/env php' : trim($match[1]);
             $binPathExported = $this->filesystem->findShortestPathCode($link, $bin, false, true);
             $streamProxyCode = $streamHint = '';
             $globalsCode = '$GLOBALS[\'_composer_bin_dir\'] = __DIR__;'."\n";
             $phpunitHack1 = $phpunitHack2 = '';
             // Don't expose autoload path when vendor dir was not set in custom installers
-            if ($this->vendorDir) {
-                $globalsCode .= '$GLOBALS[\'_composer_autoload_path\'] = ' . $this->filesystem->findShortestPathCode($link, $this->vendorDir . '/autoload.php', false, true).";\n";
+            if ($this->vendorDir !== null) {
+                // ensure comparisons work accurately if the CWD is a symlink, as $link is realpath'd already
+                $vendorDirReal = realpath($this->vendorDir);
+                if ($vendorDirReal === false) {
+                    $vendorDirReal = $this->vendorDir;
+                }
+                $globalsCode .= '$GLOBALS[\'_composer_autoload_path\'] = ' . $this->filesystem->findShortestPathCode($link, $vendorDirReal . '/autoload.php', false, true).";\n";
             }
             // Add workaround for PHPUnit process isolation
             if ($this->filesystem->normalizePath($bin) === $this->filesystem->normalizePath($this->vendorDir.'/phpunit/phpunit/phpunit')) {
@@ -337,8 +342,7 @@ if (PHP_VERSION_ID < 80000) {
         (function_exists('stream_get_wrappers') && in_array('phpvfscomposer', stream_get_wrappers(), true))
         || (function_exists('stream_wrapper_register') && stream_wrapper_register('phpvfscomposer', 'Composer\BinProxyWrapper'))
     ) {
-        include("phpvfscomposer://" . $binPathExported);
-        exit(0);
+        return include("phpvfscomposer://" . $binPathExported);
     }
 }
 
@@ -360,7 +364,7 @@ namespace Composer;
 
 $globalsCode
 $streamProxyCode
-include $binPathExported;
+return include $binPathExported;
 
 PROXY;
         }
@@ -402,7 +406,7 @@ if [ -n "\$bashSource" ]; then
     fi
 fi
 
-"\${dir}/$binFile" "\$@"
+exec "\${dir}/$binFile" "\$@"
 
 PROXY;
     }

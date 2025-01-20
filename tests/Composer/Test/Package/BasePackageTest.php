@@ -46,14 +46,20 @@ class BasePackageTest extends TestCase
     /**
      * @dataProvider provideFormattedVersions
      */
-    public function testFormatVersionForDevPackage(BasePackage $package, bool $truncate, string $expected): void
+    public function testFormatVersionForDevPackage(string $sourceReference, bool $truncate, string $expected): void
     {
-        $this->assertSame($expected, $package->getFullPrettyVersion($truncate));
+        $package = $this->getMockForAbstractClass('\Composer\Package\BasePackage', [], '', false);
+        $package->expects($this->once())->method('isDev')->will($this->returnValue(true));
+        $package->expects($this->any())->method('getSourceType')->will($this->returnValue('git'));
+        $package->expects($this->once())->method('getPrettyVersion')->will($this->returnValue('PrettyVersion'));
+        $package->expects($this->any())->method('getSourceReference')->will($this->returnValue($sourceReference));
+
+        self::assertSame($expected, $package->getFullPrettyVersion($truncate));
     }
 
-    public function provideFormattedVersions(): array
+    public static function provideFormattedVersions(): array
     {
-        $data = [
+        return [
             [
                 'sourceReference' => 'v2.1.0-RC2',
                 'truncate' => true,
@@ -75,18 +81,6 @@ class BasePackageTest extends TestCase
                 'expected' => 'PrettyVersion bbf527a27356414bfa9bf520f018c5cb7af67c77',
             ],
         ];
-
-        $createPackage = function ($arr): array {
-            $package = $this->getMockForAbstractClass('\Composer\Package\BasePackage', [], '', false);
-            $package->expects($this->once())->method('isDev')->will($this->returnValue(true));
-            $package->expects($this->any())->method('getSourceType')->will($this->returnValue('git'));
-            $package->expects($this->once())->method('getPrettyVersion')->will($this->returnValue('PrettyVersion'));
-            $package->expects($this->any())->method('getSourceReference')->will($this->returnValue($arr['sourceReference']));
-
-            return [$package, $arr['truncate'], $arr['expected']];
-        };
-
-        return array_map($createPackage, $data);
     }
 
     /**
@@ -99,13 +93,13 @@ class BasePackageTest extends TestCase
     {
         $regexp = BasePackage::packageNamesToRegexp($packageNames, $wrap);
 
-        $this->assertSame($expectedRegexp, $regexp);
+        self::assertSame($expectedRegexp, $regexp);
     }
 
     /**
      * @return mixed[][]
      */
-    public function dataPackageNamesToRegexp(): array
+    public static function dataPackageNamesToRegexp(): array
     {
         return [
             [

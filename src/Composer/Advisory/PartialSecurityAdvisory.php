@@ -14,8 +14,9 @@ namespace Composer\Advisory;
 
 use Composer\Semver\Constraint\ConstraintInterface;
 use Composer\Semver\VersionParser;
+use JsonSerializable;
 
-class PartialSecurityAdvisory
+class PartialSecurityAdvisory implements JsonSerializable
 {
     /**
      * @var string
@@ -43,7 +44,7 @@ class PartialSecurityAdvisory
     {
         $constraint = $parser->parseConstraints($data['affectedVersions']);
         if (isset($data['title'], $data['sources'], $data['reportedAt'])) {
-            return new SecurityAdvisory($packageName, $data['advisoryId'], $constraint, $data['title'], $data['sources'], new \DateTimeImmutable($data['reportedAt'], new \DateTimeZone('UTC')), $data['cve'] ?? null, $data['link'] ?? null);
+            return new SecurityAdvisory($packageName, $data['advisoryId'], $constraint, $data['title'], $data['sources'], new \DateTimeImmutable($data['reportedAt'], new \DateTimeZone('UTC')), $data['cve'] ?? null, $data['link'] ?? null, $data['severity'] ?? null);
         }
 
         return new self($packageName, $data['advisoryId'], $constraint);
@@ -54,5 +55,17 @@ class PartialSecurityAdvisory
         $this->advisoryId = $advisoryId;
         $this->packageName = $packageName;
         $this->affectedVersions = $affectedVersions;
+    }
+
+    /**
+     * @return mixed
+     */
+    #[\ReturnTypeWillChange]
+    public function jsonSerialize()
+    {
+        $data = (array) $this;
+        $data['affectedVersions'] = $data['affectedVersions']->getPrettyString();
+
+        return $data;
     }
 }
