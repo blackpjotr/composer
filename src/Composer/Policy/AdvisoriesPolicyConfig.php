@@ -75,6 +75,28 @@ class AdvisoriesPolicyConfig extends ListPolicyConfig
     }
 
     /**
+     * Get the flat ignore-list for a specific operation, combining `ignore-id` rules with
+     * package-name `ignore` rules.
+     *
+     * The Auditor's flat <id|pkgName, reason> shape predates the structured rule format;
+     * this method preserves backwards compatibility for that consumer while keeping the
+     * structured rules as the single source of truth.
+     *
+     * @param 'block'|'audit' $operation
+     * @return array<string, string|null>  Keyed by advisory ID or package name => reason
+     */
+    public function getIgnoreListForOperation(string $operation): array
+    {
+        $result = $this->getIgnoreIdForOperation($operation);
+
+        foreach ($this->getFlatIgnoreForOperation($operation) as $packageName => $reason) {
+            $result[$packageName] = static::mergeReason($result, $packageName, $reason);
+        }
+
+        return $result;
+    }
+
+    /**
      * Get ignore-severity rules filtered for a specific operation (advisories only).
      *
      * @param 'block'|'audit' $operation
@@ -100,6 +122,43 @@ class AdvisoriesPolicyConfig extends ListPolicyConfig
             $this->ignore,
             $this->ignoreId,
             $this->ignoreSeverity
+        );
+    }
+
+    public function withAudit(string $audit)
+    {
+        return new static(
+            $this->block,
+            $audit,
+            $this->ignore,
+            $this->ignoreId,
+            $this->ignoreSeverity
+        );
+    }
+
+    /**
+     * Merge an audit-scoped list of severity overrides (e.g. from a CLI
+     * --ignore-severity flag) into the existing severity rules. Existing
+     * rules win on overlap so any reason configured in policy survives.
+     *
+     * @param list<string> $severities
+     * @return static
+     */
+    public function withIgnoreSeverity(array $severities)
+    {
+        $ignoreSeverity = $this->ignoreSeverity;
+        foreach ($severities as $severity) {
+            if (!isset($ignoreSeverity[$severity])) {
+                $ignoreSeverity[$severity] = new IgnoreSeverityRule($severity, null, false, true);
+            }
+        }
+
+        return new static(
+            $this->block,
+            $this->audit,
+            $this->ignore,
+            $this->ignoreId,
+            $ignoreSeverity
         );
     }
 

@@ -12,7 +12,6 @@
 
 namespace Composer\Command;
 
-use Composer\Advisory\AuditConfig;
 use Composer\Composer;
 use Composer\FilterList\FilterListProvider\FilterListProviderSet;
 use Composer\Policy\PolicyConfig;
@@ -39,7 +38,7 @@ class AuditCommand extends BaseCommand
                 new InputOption('abandoned', null, InputOption::VALUE_REQUIRED, 'Behavior on abandoned packages. Must be "ignore", "report", or "fail".', null, Auditor::ABANDONEDS),
                 new InputOption('ignore-severity', null, InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED, 'Ignore advisories of a certain severity level.', [], ['low', 'medium', 'high', 'critical']),
                 new InputOption('ignore-unreachable', null, InputOption::VALUE_NONE, 'Ignore repositories that are unreachable or return a non-200 status code.'),
-                new InputOption('filtered', null, InputOption::VALUE_REQUIRED, 'Behavior on filtered packages. Must be "ignore", "report", or "fail".', null, Auditor::FILTERED),
+                new InputOption('filtered', null, InputOption::VALUE_REQUIRED, 'Behavior on filtered packages. Must be "ignore", "report", or "fail". Overrides the per-list audit setting for malware and every custom filter list.', null, Auditor::FILTERED),
             ])
             ->setHelp(
                 <<<EOT
@@ -72,9 +71,6 @@ EOT
             $repoSet->addRepository($repo);
         }
 
-        $policyConfig = PolicyConfig::fromConfig($composer->getConfig());
-        $auditConfig = AuditConfig::fromPolicyConfig($policyConfig);
-
         $abandoned = $input->getOption('abandoned');
         if ($abandoned !== null && !in_array($abandoned, Auditor::ABANDONEDS, true)) {
             throw new \InvalidArgumentException('--abandoned must be one of '.implode(', ', Auditor::ABANDONEDS).'.');
@@ -85,28 +81,29 @@ EOT
             throw new \InvalidArgumentException('--filtered must be one of '.implode(', ', Auditor::FILTERED).'.');
         }
 
-        $abandoned = $abandoned ?? $auditConfig->auditAbandoned;
-        $filtered = $filtered ?? $auditConfig->auditFiltered;
+        $policyConfig = $this->createPolicyConfig($composer->getConfig(), $input);
+        if ($filtered !== null || $abandoned !== null) {
+            $policyConfig = $policyConfig->withAudit($abandoned, $filtered);
+        }
 
-        $ignoreSeverities = array_merge(array_fill_keys($input->getOption('ignore-severity'), null), $auditConfig->ignoreSeverityForAudit);
-        $ignoreUnreachable = $input->getOption('ignore-unreachable') || $auditConfig->ignoreUnreachable->audit;
+        $ignoreSeverities = $input->getOption('ignore-severity');
+        if (count($ignoreSeverities) > 0) {
+            $policyConfig = $policyConfig->withIgnoreSeverity(array_values($ignoreSeverities));
+        }
+        if ($input->getOption('ignore-unreachable')) {
+            $policyConfig = $policyConfig->withIgnoreUnreachable('audit');
+        }
 
         $filterListProviderSet = $policyConfig->enabled ? FilterListProviderSet::create($policyConfig, $composer->getRepositoryManager()->getRepositories(), $composer->getLoop()->getHttpDownloader()) : null;
 
         return min(255, $auditor->audit(
             $this->getIO(),
             $repoSet,
+            $policyConfig,
             $packages,
             $this->getAuditFormat($input, 'format'),
             false,
-            $auditConfig->ignoreListForAudit,
-            $abandoned,
-            $ignoreSeverities,
-            $ignoreUnreachable,
-            $auditConfig->ignoreAbandonedForAudit,
-            $filtered,
-            $filterListProviderSet,
-            $policyConfig
+            $filterListProviderSet
         ));
 
     }

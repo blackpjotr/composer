@@ -77,28 +77,27 @@ class Auditor
     public const STATUS_FILTERED = 4;
 
     /**
+     * @param PolicyConfig $policyConfig Source of truth for ignore lists, severity filters, and per-list audit settings.
      * @param PackageInterface[] $packages
      * @param self::FORMAT_* $format The format that will be used to output audit results.
      * @param bool $warningOnly If true, outputs a warning. If false, outputs an error.
-     * @param array<string, string|null> $ignoreList List of advisory IDs, remote IDs, CVE IDs or package names that reported but not listed as vulnerabilities.
-     * @param self::ABANDONED_* $abandoned
-     * @param array<string, string|null> $ignoredSeverities List of ignored severity levels
-     * @param array<string, string|null> $ignoreAbandoned List of abandoned package name that reported but not listed as vulnerabilities.
-     * @param self::FILTERED_* $filtered
      *
      * @return int-mask<self::STATUS_*> A bitmask of STATUS_* constants or 0 on success
      * @throws InvalidArgumentException If no packages are passed in
      */
-    public function audit(IOInterface $io, RepositorySet $repoSet, array $packages, string $format, bool $warningOnly = true, array $ignoreList = [], string $abandoned = self::ABANDONED_FAIL, array $ignoredSeverities = [], bool $ignoreUnreachable = false, array $ignoreAbandoned = [], string $filtered = self::FILTERED_FAIL, ?FilterListProviderSet $filterListProviderSet = null, ?PolicyConfig $policyConfig = null): int
+    public function audit(IOInterface $io, RepositorySet $repoSet, PolicyConfig $policyConfig, array $packages, string $format, bool $warningOnly = true, ?FilterListProviderSet $filterListProviderSet = null): int
     {
-        $result = $repoSet->getMatchingSecurityAdvisories($packages, $format === self::FORMAT_SUMMARY, $ignoreUnreachable);
+        $ignoreList = $policyConfig->advisories->getIgnoreListForOperation('audit');
+        $ignoredSeverities = $policyConfig->advisories->getIgnoreSeverityForOperation('audit');
+
+        $result = $repoSet->getMatchingSecurityAdvisories($packages, $format === self::FORMAT_SUMMARY, $policyConfig->ignoreUnreachable->audit);
         $allAdvisories = $result['advisories'];
         $unreachableRepos = $result['unreachableRepos'];
 
         // we need the CVE & remote IDs set to filter ignores correctly so if we have any matches using the optimized codepath above
         // and ignores are set then we need to query again the full data to make sure it can be filtered
         if ($format === self::FORMAT_SUMMARY && $this->needsCompleteAdvisoryLoad($allAdvisories, $ignoreList)) {
-            $result = $repoSet->getMatchingSecurityAdvisories($packages, false, $ignoreUnreachable);
+            $result = $repoSet->getMatchingSecurityAdvisories($packages, false, $policyConfig->ignoreUnreachable->audit);
             $allAdvisories = $result['advisories'];
             $unreachableRepos = array_merge($unreachableRepos, $result['unreachableRepos']);
         }
@@ -106,11 +105,11 @@ class Auditor
 
         $abandonedCount = 0;
         $affectedPackagesCount = count($advisories);
-        if ($abandoned === self::ABANDONED_IGNORE) {
+        if ($policyConfig->abandoned->audit === self::ABANDONED_IGNORE) {
             $abandonedPackages = [];
         } else {
-            $abandonedPackages = $this->filterAbandonedPackages($packages, $ignoreAbandoned);
-            if ($abandoned === self::ABANDONED_FAIL) {
+            $abandonedPackages = $this->filterAbandonedPackages($packages, $policyConfig->abandoned->getFlatIgnoreForOperation('audit'));
+            if ($policyConfig->abandoned->audit === self::ABANDONED_FAIL) {
                 $abandonedCount = count($abandonedPackages);
             }
         }
@@ -118,18 +117,26 @@ class Auditor
         $filterAuditor = new FilterListAuditor();
         $filteredPackages = [];
         $filteredCount = 0;
-        if ($policyConfig !== null && $filterListProviderSet !== null && $filtered !== self::FILTERED_IGNORE) {
-            $filterResult = $filterAuditor->collectFilterLists($packages, $filterListProviderSet, $policyConfig->getActiveAuditFilterListNames(), $ignoreUnreachable || $policyConfig->ignoreUnreachable->audit);
-            $unreachableRepos = array_merge($unreachableRepos, $filterResult['unreachableRepos']);
-            foreach ($packages as $package) {
-                $matchingEntries = $filterAuditor->getMatchingAuditEntries($package, $filterResult['filter'], $policyConfig);
-                if (count($matchingEntries) > 0) {
-                    $filteredPackages[$package->getName()] = $matchingEntries;
+        $activeAuditFilterLists = $policyConfig->getActiveAuditFilterLists();
+        if ($filterListProviderSet !== null && count($activeAuditFilterLists) > 0) {
+            $failingListNames = [];
+            foreach ($activeAuditFilterLists as $name => $list) {
+                if ($list->audit === self::FILTERED_FAIL) {
+                    $failingListNames[$name] = true;
                 }
             }
 
-            if ($filtered === self::FILTERED_FAIL) {
-                $filteredCount = count($filteredPackages);
+            $filterResult = $filterAuditor->collectFilterLists($packages, $filterListProviderSet, array_keys($activeAuditFilterLists), $policyConfig->ignoreUnreachable->audit);
+            $unreachableRepos = array_merge($unreachableRepos, $filterResult['unreachableRepos']);
+            foreach ($packages as $package) {
+                $matchingEntries = $filterAuditor->getMatchingAuditEntries($package, $filterResult['filter'], $policyConfig);
+                foreach ($matchingEntries as $entry) {
+                    $filteredPackages[$package->getName()][] = $entry;
+
+                    if (isset($failingListNames[$entry->listName])) {
+                        $filteredCount++;
+                    }
+                }
             }
         }
 
@@ -200,8 +207,9 @@ class Auditor
         if (count($filteredPackages) > 0) {
             $plurality = count($filteredPackages) === 1 ? '' : 's';
             $punctuation = $format === self::FORMAT_SUMMARY ? '.' : ':';
+            $style = $filteredCount > 0 ? 'error' : 'warning';
 
-            $io->writeError(sprintf('<error>Found %d package%s matching filters%s</error>', count($filteredPackages), $plurality, $punctuation));
+            $io->writeError(sprintf('<%s>Found %d package%s matching filters%s</%s>', $style, count($filteredPackages), $plurality, $punctuation, $style));
             if ($format !== self::FORMAT_SUMMARY) {
                 $this->outputFilteredPackages($io, $filteredPackages, $format);
             }
@@ -565,8 +573,8 @@ class Auditor
         }
 
         $table = $io->getTable()
-            ->setHeaders(['Package', 'Versions', 'Filter List', 'URL', 'Reason', 'ID'])
-            ->setColumnMaxWidth(5, 40)
+            ->setHeaders(['Package', 'Versions', 'List', 'URL', 'Reason', 'ID', 'Source'])
+            ->setColumnMaxWidth(4, 40)
         ;
 
         foreach ($filteredPackages as $data) {
@@ -578,6 +586,7 @@ class Auditor
                     $entry->url ?? '',
                     $entry->reason ?? '',
                     $entry->id ?? '',
+                    $entry->source ?? '',
                 ]));
             }
         }

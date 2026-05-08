@@ -12,6 +12,7 @@
 
 namespace Composer\Policy;
 
+use Composer\Advisory\Auditor;
 use Composer\Config;
 use Composer\Semver\VersionParser;
 use Composer\Util\Platform;
@@ -358,6 +359,65 @@ class PolicyConfig
             $this->advisories->withBlockingDisabled(),
             $this->malware->withBlockingDisabled(),
             $this->abandoned->withBlockingDisabled(),
+            $customLists,
+            $this->ignoreUnreachable
+        );
+    }
+
+    /**
+     * Flip the listed scopes (audit, install, update) to true, leaving the
+     * remaining scopes at their current value. At least one scope is required —
+     * the caller must declare the scope they intend to widen.
+     */
+    public function withIgnoreUnreachable(string ...$scopes): self
+    {
+        return new self(
+            $this->enabled,
+            $this->advisories,
+            $this->malware,
+            $this->abandoned,
+            $this->customLists,
+            $this->ignoreUnreachable->with(...$scopes)
+        );
+    }
+
+    /**
+     * @param list<string> $severities
+     */
+    public function withIgnoreSeverity(array $severities): self
+    {
+        return new self(
+            $this->enabled,
+            $this->advisories->withIgnoreSeverity($severities),
+            $this->malware,
+            $this->abandoned,
+            $this->customLists,
+            $this->ignoreUnreachable
+        );
+    }
+
+    /**
+     * `$abandoned` overrides only the abandoned list. `$filtered` is a blunt
+     * override: it overwrites the audit setting for malware *and every custom
+     * list*, including lists explicitly configured as audit=fail in the policy
+     * config.
+     *
+     * @param null|ListPolicyConfig::AUDIT_* $abandoned
+     * @param null|ListPolicyConfig::AUDIT_* $filtered
+     * @return static
+     */
+    public function withAudit(?string $abandoned, ?string $filtered)
+    {
+        $customLists = [];
+        foreach ($this->customLists as $name => $list) {
+            $customLists[$name] = $list->withAudit($filtered !== null ? $filtered : $list->audit);
+        }
+
+        return new self(
+            $this->enabled,
+            $this->advisories,
+            $this->malware->withAudit($filtered !== null ? $filtered : $this->malware->audit),
+            $this->abandoned->withAudit($abandoned !== null ? $abandoned : $this->abandoned->audit),
             $customLists,
             $this->ignoreUnreachable
         );
