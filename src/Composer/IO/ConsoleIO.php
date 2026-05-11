@@ -184,7 +184,7 @@ class ConsoleIO extends BaseIO
             }, (array) $messages);
         }
 
-        if ($this->sendTimestamps) {
+        if ($this->sendTimestamps !== false) {
             $messages = array_map(function ($message): string {
                 return sprintf('[%s] %s', (new \DateTime())->format($this->sendTimestamps), $message);
             }, (array) $messages);

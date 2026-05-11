@@ -1021,17 +1021,7 @@ parameters:
 			path: ../src/Composer/DependencyResolver/Decisions.php
 
 		-
-			message: "#^Cannot call method getPrettyString\\(\\) on array\\<string, Composer\\\\Package\\\\BasePackage\\|Composer\\\\Semver\\\\Constraint\\\\ConstraintInterface\\|string\\>\\|Composer\\\\Package\\\\BasePackage\\|Composer\\\\Package\\\\Link\\|int\\|string\\.$#"
-			count: 1
-			path: ../src/Composer/DependencyResolver/Problem.php
-
-		-
 			message: "#^Cannot call method getRepoName\\(\\) on Composer\\\\Repository\\\\RepositoryInterface\\|null\\.$#"
-			count: 1
-			path: ../src/Composer/DependencyResolver/Problem.php
-
-		-
-			message: "#^Cannot cast array\\{package\\: Composer\\\\Package\\\\BasePackage\\}\\|array\\{packageName\\: string, constraint\\: Composer\\\\Semver\\\\Constraint\\\\ConstraintInterface\\}\\|Composer\\\\Package\\\\BasePackage\\|Composer\\\\Package\\\\Link\\|int\\|non\\-empty\\-string to string\\.$#"
 			count: 1
 			path: ../src/Composer/DependencyResolver/Problem.php
 
@@ -1442,6 +1432,11 @@ parameters:
 
 		-
 			message: "#^Parameter \\#1 \\$attempts of method Symfony\\\\Component\\\\Console\\\\Question\\\\Question\\:\\:setMaxAttempts\\(\\) expects int\\|null, int\\<min, \\-1\\>\\|int\\<1, max\\>\\|true\\|null given\\.$#"
+			count: 1
+			path: ../src/Composer/IO/ConsoleIO.php
+
+		-
+			message: "#^Parameter \\#1 \\$format of method DateTime\\:\\:format\\(\\) expects string, string\\|false given\\.$#"
 			count: 1
 			path: ../src/Composer/IO/ConsoleIO.php
 
@@ -3960,7 +3955,7 @@ parameters:
 
 		-
 			message: "#^Cannot call method solve\\(\\) on Composer\\\\DependencyResolver\\\\Solver\\|null\\.$#"
-			count: 9
+			count: 8
 			path: ../tests/Composer/Test/DependencyResolver/SolverTest.php
 
 		-
