@@ -17,6 +17,10 @@
   * Fixed inconsistent treatment of SingleCommandApplication script commands wrt autoloading (#12758)
   * Fixed some platform package parsing failing when Composer runs in web SAPIs (#12735)
 
+### [2.9.8] 2026-05-13
+
+  * Security: Fixed GitHub token validation and disclosure (GHSA-f9f8-rm49-7jv2)
+
 ### [2.9.7] 2026-04-14
 
   * Fixes regression calling custom script command aliases that are called a substring of a composer command (#12802)
@@ -2161,6 +2165,7 @@
   * Initial release
 
 [2.10.0-RC1]: https://github.com/composer/composer/compare/2.9.5...2.10.0-RC1
+[2.9.8]: https://github.com/composer/composer/compare/2.9.7...2.9.8
 [2.9.7]: https://github.com/composer/composer/compare/2.9.6...2.9.7
 [2.9.6]: https://github.com/composer/composer/compare/2.9.5...2.9.6
 [2.9.5]: https://github.com/composer/composer/compare/2.9.4...2.9.5
