@@ -30,6 +30,7 @@ jobs:
         with:
           php-version: "${{ matrix.php-version }}"
           coverage: none
+          tools: "composer:snapshot"
 
       - uses: ramsey/composer-install@3cf229dc2919194e9e36783941438d17239e8520 # 3.1.1
         with:

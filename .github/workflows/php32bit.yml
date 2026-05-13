@@ -30,7 +30,7 @@ jobs:
           extensions: "intl, zip"
           ini-values: "memory_limit=-1, phar.readonly=0, error_reporting=E_ALL, display_errors=On, display_startup_errors=On"
           php-version: "8.4"
-          tools: composer
+          tools: "composer:snapshot"
 
       - name: "Install dependencies from composer.lock using composer binary provided by system"
         run: "composer install ${{ env.COMPOSER_FLAGS }}"
