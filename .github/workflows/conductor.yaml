@@ -33,6 +33,7 @@ jobs:
               with:
                   php-version: "latest"
                   coverage: "none"
+                  tools: "composer:snapshot"
 
             # See the Conductor GitHub Action at https://github.com/packagist/conductor-github-action
             - name: "Running Conductor"
